@@ -1,54 +1,106 @@
-# scp-terminal
+# SCP Terminal
 
-This template should help get you started developing with Vue 3 in Vite.
+一个基于 Site-19 主题的浏览器终端模拟器。Vue 3 + xterm.js 构建,以基金会风格的启动流程、暗色终端美学和滚动日志流为核心体验。
 
-## Recommended IDE Setup
+**在线体验:** https://scp-terminal-62e.pages.dev/
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 特性
 
-## Recommended Browser Setup
+- **开机仪式感** — Power 开机页(Start 按钮)→ 全屏 + 电源音 → systemd 风格开机日志滚动(逐行浮现 + 打字音)→ 登录页
+- **终端核心** — xterm.js + Campbell 配色 + Cascadia Code,OPFS 虚拟文件系统(FHS 结构,持久化)
+- **22 个命令** — 基础文件系统命令 + 9 个系统诊断命令,全部以滚动日志流输出(逐行定时浮现,`[ OK ]`/`[ WARN ]` 状态标记)
+- **移动端自定义键盘** — simple-keyboard 驱动,系统键盘完全替换,统一输入体验;极简暗色设计 + SVG 图标 + 按键音
+- **音频** — Web Audio 合成(零音频文件):电源音、日志打字音、键盘按键音
+- **SCP 叙事轻点缀** — `containment`(隔离区收容状态)、`log`(站点日志,含 redacted 条目)、`security` 中的收容单元/E-11 巡逻
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 技术栈
 
-## Type Support for `.vue` Imports in TS
+- **框架:** Vue 3(script setup)+ Vite 8 + TypeScript
+- **终端:** @xterm/xterm 6 + @xterm/addon-fit
+- **键盘:** simple-keyboard 3
+- **存储:** OPFS(浏览器文件系统,凭据存于 `.scp-credentials.json`)
+- **测试:** Vitest + @vue/test-utils
+- **Lint/格式:** oxlint + ESLint + Prettier
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 快速开始
 
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
+```bash
+npm install        # 安装依赖
+npm run dev        # 启动开发服务器 (http://localhost:5173)
+npm run build      # 类型检查 + 生产构建 (dist/)
+npm run preview    # 预览构建产物
 ```
 
-### Compile and Hot-Reload for Development
+## 验证
 
-```sh
-npm run dev
+```bash
+npm run test:unit -- --run   # 单元测试
+npm run lint                 # oxlint + eslint
+npm run format               # prettier 格式化
 ```
 
-### Type-Check, Compile and Minify for Production
+> 若测试数量异常(与预期不符),先清理 Vite 缓存:`rm -rf node_modules/.vite node_modules/.vite-temp`
 
-```sh
+## 命令列表
+
+### 基础命令
+
+| 命令 | 功能 |
+|---|---|
+| `pwd` / `ls` / `cd` / `cat` / `echo` | 文件系统导航 |
+| `mkdir` / `touch` / `rm` | 文件操作 |
+| `clear` | 清屏 |
+| `help` | 显示命令列表 |
+| `date` / `whoami` / `uname` | 系统基础信息 |
+
+### 系统诊断命令(滚动日志流)
+
+| 命令 | 功能 |
+|---|---|
+| `sysinfo` | 系统信息:内核 / CPU / 内存 / 固件 |
+| `check` | 全量健康检查 |
+| `network` | 网络诊断:接口 / 路由 / 加密隧道 / 延迟 |
+| `services` | systemd 服务列表(16 个) |
+| `disk` | 磁盘挂载表 |
+| `security` | 安全扫描:防火墙 / 补丁 / 收容单元 / E-11 |
+| `trace <ip>` | 路由追踪(12 跳,默认 8.8.8.8) |
+| `containment` | 隔离区收容状态查询 |
+| `log` | 站点日志查看(含 redacted 条目) |
+
+## 项目结构
+
+```
+src/
+├── App.vue                 # 视图流程: power → boot → login → terminal
+├── audio/sfx.ts            # Web Audio 合成音效
+├── auth/credentials.ts     # 凭据(OPFS, SHA-256 + salt)
+├── boot/bootLog.ts         # 开机日志数据(66 行, systemd 风格)
+├── components/
+│   ├── PowerScreen.vue     # 开机 Start 按钮 + 全屏
+│   ├── BootLog.vue         # 开机日志滚动动画
+│   ├── LoginView.vue       # 登录 / 注册
+│   ├── TerminalView.vue    # xterm 终端 + 键盘集成
+│   └── CustomKeyboard.vue  # 自定义键盘(simple-keyboard)
+├── composables/useTouch.ts # 粗指针检测
+└── terminal/
+    ├── shell.ts            # 命令执行器 + 基础命令
+    ├── systemCommands.ts   # 系统诊断命令(日志流)
+    └── fs/                 # OPFS 文件系统后端 + FHS 种子
+```
+
+## 部署
+
+### Cloudflare Pages(direct upload)
+
+```bash
 npm run build
+npx wrangler pages deploy dist --project-name scp-terminal
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+### 流程说明
 
-```sh
-npm run test:unit
-```
+启动流程:Power 开机页 → 点击 START(全屏 + 电源音)→ 开机日志滚动 → 登录页(首次注册/之后登录)→ 终端。触摸设备自动启用自定义键盘,系统键盘被替换。
 
-### Lint with [ESLint](https://eslint.org/)
+## 许可
 
-```sh
-npm run lint
-```
+[AGPL-3.0](LICENSE) — Copyright (C) 2026 lemonhub-io
