@@ -1,3 +1,5 @@
+import { t } from '../i18n'
+
 const CREDENTIALS_FILE = '.scp-credentials.json'
 
 export interface StoredCredentials {
@@ -8,7 +10,17 @@ export interface StoredCredentials {
 
 export const MIN_PASSWORD_LENGTH = 4
 
-export class CredentialsError extends Error {}
+export type CredentialsErrorCode = 'empty_username' | 'password_too_short' | 'account_exists'
+
+export class CredentialsError extends Error {
+  code: CredentialsErrorCode
+
+  constructor(code: CredentialsErrorCode, params?: Record<string, unknown>) {
+    super(t(`auth.errors.${code}`, params))
+    this.name = 'CredentialsError'
+    this.code = code
+  }
+}
 
 export async function hasCredentials(): Promise<boolean> {
   const root = await getRoot()
@@ -23,14 +35,14 @@ export async function hasCredentials(): Promise<boolean> {
 export async function register(username: string, password: string): Promise<void> {
   const trimmed = username.trim()
   if (!trimmed) {
-    throw new CredentialsError('Username must not be empty')
+    throw new CredentialsError('empty_username')
   }
   if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new CredentialsError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+    throw new CredentialsError('password_too_short', { min: MIN_PASSWORD_LENGTH })
   }
 
   if (await hasCredentials()) {
-    throw new CredentialsError('Account already exists')
+    throw new CredentialsError('account_exists')
   }
 
   const salt = randomSalt()

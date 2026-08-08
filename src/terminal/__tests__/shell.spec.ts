@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { setLocale } from '../../i18n'
 import { FsError } from '../fs/types'
 import type { FsBackend, FsEntry } from '../fs/types'
 import { HOME_DIR } from '../fs/paths'
@@ -24,7 +25,7 @@ class MemoryBackend implements FsBackend {
   async list(path: string): Promise<FsEntry[]> {
     const node = this.requireNode(path)
     if (node.type !== 'dir') {
-      throw new FsError('ENOTDIR', `Not a directory: ${path}`)
+      throw new FsError('ENOTDIR', path)
     }
     const prefix = path === '/' ? '/' : path + '/'
     return [...this.nodes]
@@ -40,7 +41,7 @@ class MemoryBackend implements FsBackend {
   async read(path: string): Promise<string> {
     const node = this.requireNode(path)
     if (node.type !== 'file') {
-      throw new FsError('EISDIR', `Is a directory: ${path}`)
+      throw new FsError('EISDIR', path)
     }
     return node.content
   }
@@ -48,14 +49,14 @@ class MemoryBackend implements FsBackend {
   async write(path: string, content: string): Promise<void> {
     const existing = this.nodes.get(path)
     if (existing && existing.type !== 'file') {
-      throw new FsError('EISDIR', `Is a directory: ${path}`)
+      throw new FsError('EISDIR', path)
     }
     this.nodes.set(path, { type: 'file', content })
   }
 
   async mkdir(path: string): Promise<void> {
     if (this.nodes.has(path)) {
-      throw new FsError('EEXIST', `File exists: ${path}`)
+      throw new FsError('EEXIST', path)
     }
     this.nodes.set(path, { type: 'dir', content: '' })
   }
@@ -63,7 +64,7 @@ class MemoryBackend implements FsBackend {
   async remove(path: string): Promise<void> {
     const node = this.requireNode(path)
     if (node.type === 'dir' && [...this.nodes.keys()].some((key) => key.startsWith(path + '/'))) {
-      throw new FsError('ENOTEMPTY', `Directory not empty: ${path}`)
+      throw new FsError('ENOTEMPTY', path)
     }
     this.nodes.delete(path)
   }
@@ -81,7 +82,7 @@ class MemoryBackend implements FsBackend {
   private requireNode(path: string): { type: 'dir' | 'file'; content: string } {
     const node = this.nodes.get(path)
     if (!node) {
-      throw new FsError('ENOENT', `No such file or directory: ${path}`)
+      throw new FsError('ENOENT', path)
     }
     return node
   }
@@ -121,6 +122,7 @@ describe('shell', () => {
   let out: TestHarness
 
   beforeEach(async () => {
+    setLocale('en')
     out = createContext()
     await out.ctx.fs.init()
   })

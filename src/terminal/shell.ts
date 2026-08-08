@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import { FsError } from './fs/types'
 import type { FsBackend } from './fs/types'
 import { HOME_DIR, resolvePath } from './fs/paths'
@@ -33,187 +34,135 @@ interface Segment {
   redirect: { path: string; append: boolean } | null
 }
 
+function defineCommand(name: string, run: Command['run']): Command {
+  return {
+    name,
+    get usage() {
+      return t(`shell.cmd.${name}.usage`)
+    },
+    get description() {
+      return t(`shell.cmd.${name}.description`)
+    },
+    run,
+  }
+}
+
 const commands: Command[] = [
-  {
-    name: 'pwd',
-    usage: 'pwd',
-    description: 'Print the current working directory',
-    run: (_args, ctx) => {
-      ctx.stdout(ctx.cwd)
-    },
-  },
-  {
-    name: 'ls',
-    usage: 'ls [-a] [-l] [-h] [path]',
-    description: 'List directory contents',
-    run: async (args, ctx) => {
-      const { flags, positionals } = parseOptions(args)
-      const showAll = flags.has('-a')
-      const long = flags.has('-l')
-      const human = flags.has('-h')
-      const path = abs(ctx.cwd, positionals[0] ?? '.')
-      const entries = (await ctx.fs.list(path)).filter((e) => showAll || !e.name.startsWith('.'))
-      if (long) {
-        const rows = entries.map((e) => {
-          const perm = e.type === 'dir' ? 'drwxr-xr-x' : '-rw-r--r--'
-          const size = human ? humanizeSize(e.size) : String(e.size)
-          return `${perm}  1 user user ${size.padStart(8)} Aug  7 02:00 ${e.name}`
-        })
-        ctx.stdout(rows.join('\n') || '.')
-        return
+  defineCommand('pwd', (_args, ctx) => {
+    ctx.stdout(ctx.cwd)
+  }),
+  defineCommand('ls', async (args, ctx) => {
+    const { flags, positionals } = parseOptions(args)
+    const showAll = flags.has('-a')
+    const long = flags.has('-l')
+    const human = flags.has('-h')
+    const path = abs(ctx.cwd, positionals[0] ?? '.')
+    const entries = (await ctx.fs.list(path)).filter((e) => showAll || !e.name.startsWith('.'))
+    if (long) {
+      const rows = entries.map((e) => {
+        const perm = e.type === 'dir' ? 'drwxr-xr-x' : '-rw-r--r--'
+        const size = human ? humanizeSize(e.size) : String(e.size)
+        return `${perm}  1 user user ${size.padStart(8)} Aug  7 02:00 ${e.name}`
+      })
+      ctx.stdout(rows.join('\n') || '.')
+      return
+    }
+    ctx.stdout(entries.map((e) => (e.type === 'dir' ? e.name + '/' : e.name)).join('  ') || '.')
+  }),
+  defineCommand('cd', async (args, ctx) => {
+    const path = abs(ctx.cwd, args[0] ?? HOME_DIR)
+    const stat = await ctx.fs.stat(path)
+    if (stat.type !== 'dir') {
+      throw new FsError('ENOTDIR', args[0] ?? '')
+    }
+    ctx.cwd = path
+  }),
+  defineCommand('cat', async (args, ctx) => {
+    if (args.length === 0) {
+      ctx.stdout(ctx.stdin.replace(/\n$/, ''))
+      return
+    }
+    for (const file of args) {
+      const content = await ctx.fs.read(abs(ctx.cwd, file))
+      ctx.stdout(content.replace(/\n$/, ''))
+    }
+  }),
+  defineCommand('echo', (args, ctx) => {
+    const { flags, positionals } = parseOptions(args)
+    void flags
+    ctx.stdout(positionals.join(' '))
+  }),
+  defineCommand('mkdir', async (args, ctx) => {
+    const parent = args[0] === '-p'
+    const paths = parent ? args.slice(1) : args
+    for (const p of paths) {
+      const resolved = abs(ctx.cwd, p)
+      if (parent) {
+        await mkdirRecursive(ctx.fs, resolved)
+      } else {
+        await ctx.fs.mkdir(resolved)
       }
-      ctx.stdout(entries.map((e) => (e.type === 'dir' ? e.name + '/' : e.name)).join('  ') || '.')
-    },
-  },
-  {
-    name: 'cd',
-    usage: 'cd [path]',
-    description: 'Change the current directory',
-    run: async (args, ctx) => {
-      const path = abs(ctx.cwd, args[0] ?? HOME_DIR)
-      const stat = await ctx.fs.stat(path)
-      if (stat.type !== 'dir') {
-        throw new FsError('ENOTDIR', `Not a directory: ${args[0] ?? ''}`)
+    }
+  }),
+  defineCommand('touch', async (args, ctx) => {
+    for (const file of args) {
+      const resolved = abs(ctx.cwd, file)
+      if (await ctx.fs.exists(resolved)) {
+        throw new FsError('EEXIST', file)
       }
-      ctx.cwd = path
-    },
-  },
-  {
-    name: 'cat',
-    usage: 'cat [file...]',
-    description: 'Print file contents (or stdin when no file)',
-    run: async (args, ctx) => {
-      if (args.length === 0) {
-        ctx.stdout(ctx.stdin.replace(/\n$/, ''))
-        return
-      }
-      for (const file of args) {
-        const content = await ctx.fs.read(abs(ctx.cwd, file))
-        ctx.stdout(content.replace(/\n$/, ''))
-      }
-    },
-  },
-  {
-    name: 'echo',
-    usage: 'echo [-n] [text...]',
-    description: 'Print text to the terminal',
-    run: (args, ctx) => {
-      const { flags, positionals } = parseOptions(args)
-      void flags
-      ctx.stdout(positionals.join(' '))
-    },
-  },
-  {
-    name: 'mkdir',
-    usage: 'mkdir [-p] <dir>',
-    description: 'Create a directory',
-    run: async (args, ctx) => {
-      const parent = args[0] === '-p'
-      const paths = parent ? args.slice(1) : args
-      for (const p of paths) {
-        const resolved = abs(ctx.cwd, p)
-        if (parent) {
-          await mkdirRecursive(ctx.fs, resolved)
+      await ctx.fs.write(resolved, '')
+    }
+  }),
+  defineCommand('rm', async (args, ctx) => {
+    const recursive = args.includes('-r')
+    const force = args.includes('-f')
+    const paths = args.filter((a) => !a.startsWith('-'))
+    for (const p of paths) {
+      const resolved = abs(ctx.cwd, p)
+      try {
+        if (recursive) {
+          await removeRecursive(ctx.fs, resolved)
         } else {
-          await ctx.fs.mkdir(resolved)
+          await ctx.fs.remove(resolved)
         }
-      }
-    },
-  },
-  {
-    name: 'touch',
-    usage: 'touch <file...>',
-    description: 'Create empty files',
-    run: async (args, ctx) => {
-      for (const file of args) {
-        const resolved = abs(ctx.cwd, file)
-        if (await ctx.fs.exists(resolved)) {
-          throw new FsError('EEXIST', `File exists: ${file}`)
+      } catch (error) {
+        if (force && error instanceof FsError && error.code === 'ENOENT') {
+          continue
         }
-        await ctx.fs.write(resolved, '')
+        throw error
       }
-    },
-  },
-  {
-    name: 'rm',
-    usage: 'rm [-r] [-f] <path...>',
-    description: 'Remove files or directories',
-    run: async (args, ctx) => {
-      const recursive = args.includes('-r')
-      const force = args.includes('-f')
-      const paths = args.filter((a) => !a.startsWith('-'))
-      for (const p of paths) {
-        const resolved = abs(ctx.cwd, p)
-        try {
-          if (recursive) {
-            await removeRecursive(ctx.fs, resolved)
-          } else {
-            await ctx.fs.remove(resolved)
-          }
-        } catch (error) {
-          if (force && error instanceof FsError && error.code === 'ENOENT') {
-            continue
-          }
-          throw error
-        }
-      }
-    },
-  },
-  {
-    name: 'clear',
-    usage: 'clear',
-    description: 'Clear the terminal screen',
-    run: (_args, ctx) => {
-      ctx.clear()
-    },
-  },
-  {
-    name: 'help',
-    usage: 'help',
-    description: 'Show available commands',
-    run: (_args, ctx) => {
-      const lines = commands.map((c) => `  ${c.usage.padEnd(22)} ${c.description}`)
-      ctx.stdout(['Available commands:', ...lines, ''].join('\n'))
-    },
-  },
-  {
-    name: 'date',
-    usage: 'date',
-    description: 'Show the current date and time',
-    run: (_args, ctx) => {
-      ctx.stdout(new Date().toLocaleString())
-    },
-  },
-  {
-    name: 'whoami',
-    usage: 'whoami',
-    description: 'Print the current user',
-    run: (_args, ctx) => {
-      ctx.stdout(ctx.user)
-    },
-  },
-  {
-    name: 'uname',
-    usage: 'uname [-a] [-s] [-n] [-r]',
-    description: 'Print system information',
-    run: (args, ctx) => {
-      const all = args.includes('-a')
-      const fields: string[] = []
-      if (all || args.includes('-s')) {
-        fields.push('SCP-Terminal')
-      }
-      if (all || args.includes('-n')) {
-        fields.push('localhost')
-      }
-      if (all || args.includes('-r')) {
-        fields.push('6.8.0-scp')
-      }
-      if (fields.length === 0) {
-        fields.push('SCP-Terminal')
-      }
-      ctx.stdout(fields.join(' '))
-    },
-  },
+    }
+  }),
+  defineCommand('clear', (_args, ctx) => {
+    ctx.clear()
+  }),
+  defineCommand('help', (_args, ctx) => {
+    const lines = commands.map((c) => `  ${c.usage.padEnd(22)} ${c.description}`)
+    ctx.stdout([t('shell.availableCommands'), ...lines, ''].join('\n'))
+  }),
+  defineCommand('date', (_args, ctx) => {
+    ctx.stdout(new Date().toLocaleString())
+  }),
+  defineCommand('whoami', (_args, ctx) => {
+    ctx.stdout(ctx.user)
+  }),
+  defineCommand('uname', (args, ctx) => {
+    const all = args.includes('-a')
+    const fields: string[] = []
+    if (all || args.includes('-s')) {
+      fields.push('SCP-Terminal')
+    }
+    if (all || args.includes('-n')) {
+      fields.push('localhost')
+    }
+    if (all || args.includes('-r')) {
+      fields.push('6.8.0-scp')
+    }
+    if (fields.length === 0) {
+      fields.push('SCP-Terminal')
+    }
+    ctx.stdout(fields.join(' '))
+  }),
   ...systemCommands,
 ]
 
@@ -238,8 +187,8 @@ export async function executeCommand(line: string, ctx: CommandContext): Promise
     const command = commandByName.get(name)
 
     if (!command) {
-      ctx.stderr(`bash: ${name}: command not found`)
-      ctx.stderr(`Type "help" to see available commands.`)
+      ctx.stderr(t('shell.commandNotFound', { name }))
+      ctx.stderr(t('shell.helpHint'))
       return
     }
 
@@ -269,7 +218,7 @@ export async function executeCommand(line: string, ctx: CommandContext): Promise
       if (error instanceof Error) {
         ctx.stderr(`${name}: ${error.message}`)
       } else {
-        ctx.stderr(`${name}: unknown error`)
+        ctx.stderr(`${name}: ${t('shell.unknownError')}`)
       }
     }
     ctx.cwd = segmentCtx.cwd

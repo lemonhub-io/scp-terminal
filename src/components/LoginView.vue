@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { register, verify } from '../auth/credentials'
 import type { CredentialsError } from '../auth/credentials'
 import CustomKeyboard from './CustomKeyboard.vue'
 import { useIsCoarse } from '../composables/useTouch'
 
+const { t } = useI18n()
 const isCoarse = useIsCoarse()
 
 const props = defineProps<{
@@ -44,11 +46,11 @@ watch(activeField, async (field) => {
   }
 })
 
-const title = computed(() => (props.mode === 'register' ? 'Set up your account' : 'Sign in'))
+const title = computed(() =>
+  props.mode === 'register' ? t('login.registerTitle') : t('login.loginTitle'),
+)
 const subtitle = computed(() =>
-  props.mode === 'register'
-    ? 'First run — create a username and password'
-    : 'Enter your username and password',
+  props.mode === 'register' ? t('login.registerSubtitle') : t('login.loginSubtitle'),
 )
 
 function onKeyboardInput(key: string): void {
@@ -84,7 +86,7 @@ async function submit(): Promise<void> {
       if (ok) {
         emit('authenticated', username.value.trim())
       } else {
-        error.value = 'Invalid username or password'
+        error.value = t('login.invalidCredentials')
       }
     }
   } catch (err) {
@@ -105,17 +107,17 @@ function onKeydown(event: KeyboardEvent): void {
   <div ref="screenEl" class="login-screen">
     <div class="login-scroll">
       <div ref="loginBox" class="login-box">
-        <h1 class="title">SCP Terminal</h1>
+        <h1 class="title">{{ t('login.title') }}</h1>
         <p class="subtitle">{{ subtitle }}</p>
 
         <label class="field">
-          <span class="label">Username</span>
+          <span class="label">{{ t('login.username') }}</span>
           <input
             v-model="username"
             class="input"
             type="text"
             autocomplete="username"
-            placeholder="user"
+            :placeholder="t('login.usernamePlaceholder')"
             :readonly="isCoarse"
             :disabled="busy"
             @click="focusField('username')"
@@ -125,7 +127,7 @@ function onKeydown(event: KeyboardEvent): void {
         </label>
 
         <label class="field">
-          <span class="label">Password</span>
+          <span class="label">{{ t('login.password') }}</span>
           <input
             v-model="password"
             class="input"
@@ -143,11 +145,17 @@ function onKeydown(event: KeyboardEvent): void {
         <p v-if="error" class="error">{{ error }}</p>
 
         <button class="submit" type="button" :disabled="busy" @click="submit">
-          {{ busy ? 'Working...' : title }}
+          {{ busy ? t('login.working') : title }}
         </button>
       </div>
     </div>
-    <CustomKeyboard v-if="isCoarse" :visible="activeField !== null" @keypress="onKeyboardInput" />
+    <CustomKeyboard
+      v-if="isCoarse"
+      :visible="activeField !== null"
+      dismissible
+      @keypress="onKeyboardInput"
+      @dismiss="activeField = null"
+    />
   </div>
 </template>
 

@@ -73,7 +73,10 @@ export function playKeyClick(): void {
   if (!c) {
     return
   }
-  tone(1150, 0, 0.035, 'triangle', 0.03)
+  // Slight pitch variance so rapid typing feels less flat
+  const jitter = 1 + (Math.random() * 0.06 - 0.03)
+  tone(1180 * jitter, 0, 0.028, 'triangle', 0.026)
+  tone(2100 * jitter, 0, 0.014, 'sine', 0.008)
 }
 
 export function playKeyFunc(): void {
@@ -81,7 +84,8 @@ export function playKeyFunc(): void {
   if (!c) {
     return
   }
-  tone(700, 0, 0.045, 'triangle', 0.026)
+  tone(640, 0, 0.04, 'triangle', 0.024)
+  tone(920, 0.008, 0.03, 'sine', 0.01)
 }
 
 export function playBootDone(): void {

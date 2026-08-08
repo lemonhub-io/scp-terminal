@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import PowerScreen from './components/PowerScreen.vue'
 import BootLog from './components/BootLog.vue'
 import LoginView from './components/LoginView.vue'
 import TerminalView from './components/TerminalView.vue'
+import LocaleSwitcher from './components/LocaleSwitcher.vue'
 import { hasCredentials } from './auth/credentials'
+import { t } from './i18n'
 
 type View = 'power' | 'boot' | 'login' | 'terminal'
 type LoginMode = 'register' | 'login'
 
+const { locale } = useI18n()
 const view = ref<View>('power')
 const loginMode = ref<LoginMode>('login')
 const username = ref('')
@@ -16,6 +20,14 @@ const username = ref('')
 onMounted(async () => {
   loginMode.value = (await hasCredentials()) ? 'login' : 'register'
 })
+
+watch(
+  locale,
+  () => {
+    document.title = t('app.title')
+  },
+  { immediate: true },
+)
 
 function onPowerStart(): void {
   view.value = 'boot'
@@ -32,6 +44,7 @@ function onAuthenticated(name: string): void {
 </script>
 
 <template>
+  <LocaleSwitcher />
   <Transition name="fade" mode="out-in">
     <PowerScreen v-if="view === 'power'" @start="onPowerStart" />
     <BootLog v-else-if="view === 'boot'" @finished="onBootFinished" />

@@ -57,7 +57,7 @@ export class OpfsBackend implements FsBackend {
       // not present yet — fine
     }
     if (existing) {
-      throw new FsError('EEXIST', `File exists: ${path}`)
+      throw new FsError('EEXIST', path)
     }
     try {
       await dir.getDirectoryHandle(name, { create: true })
@@ -77,7 +77,7 @@ export class OpfsBackend implements FsBackend {
         await dir.getFileHandle(name)
         entryType = 'file'
       } catch {
-        throw new FsError('ENOENT', `No such file or directory: ${path}`)
+        throw new FsError('ENOENT', path)
       }
     }
     if (entryType === 'dir') {
@@ -88,7 +88,7 @@ export class OpfsBackend implements FsBackend {
         break
       }
       if (hasChildren) {
-        throw new FsError('ENOTEMPTY', `Directory not empty: ${path}`)
+        throw new FsError('ENOTEMPTY', path)
       }
     }
     await dir.removeEntry(name)
@@ -152,7 +152,7 @@ export class OpfsBackend implements FsBackend {
     const parts = toParts(path)
     const name = parts.pop() ?? ''
     if (parts.length === 0 && name === '') {
-      throw new FsError('EISDIR', `Is a directory: ${path}`)
+      throw new FsError('EISDIR', path)
     }
     const dir = await this.resolveDir(parts, path)
     return { dir, name }
@@ -160,7 +160,7 @@ export class OpfsBackend implements FsBackend {
 
   private requireRoot(): DirHandle {
     if (!this.root) {
-      throw new FsError('ENOENT', 'Backend not initialized')
+      throw new FsError('ENOENT', '/')
     }
     return this.root
   }
@@ -177,11 +177,11 @@ function mapLookupError(error: unknown, path: string, asFile: boolean): FsError 
   if (error instanceof DOMException) {
     switch (error.name) {
       case 'NotFoundError':
-        return new FsError('ENOENT', `No such file or directory: ${path}`)
+        return new FsError('ENOENT', path)
       case 'TypeMismatchError':
-        return new FsError(asFile ? 'EISDIR' : 'ENOTDIR', `${asFile ? 'Is a directory' : 'Not a directory'}: ${path}`)
+        return new FsError(asFile ? 'EISDIR' : 'ENOTDIR', path)
       case 'InvalidModificationError':
-        return new FsError('EEXIST', `File exists: ${path}`)
+        return new FsError('EEXIST', path)
     }
   }
   throw error

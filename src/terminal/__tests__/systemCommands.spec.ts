@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { setLocale } from '../../i18n'
 import { FsError } from '../fs/types'
 import type { FsBackend, FsEntry } from '../fs/types'
 import { ensureSeedTree } from '../fs/seed'
@@ -23,7 +24,7 @@ class MemoryBackend implements FsBackend {
   async list(path: string): Promise<FsEntry[]> {
     const node = this.requireNode(path)
     if (node.type !== 'dir') {
-      throw new FsError('ENOTDIR', `Not a directory: ${path}`)
+      throw new FsError('ENOTDIR', path)
     }
     const prefix = path === '/' ? '/' : path + '/'
     return [...this.nodes]
@@ -39,7 +40,7 @@ class MemoryBackend implements FsBackend {
   async read(path: string): Promise<string> {
     const node = this.requireNode(path)
     if (node.type !== 'file') {
-      throw new FsError('EISDIR', `Is a directory: ${path}`)
+      throw new FsError('EISDIR', path)
     }
     return node.content
   }
@@ -47,14 +48,14 @@ class MemoryBackend implements FsBackend {
   async write(path: string, content: string): Promise<void> {
     const existing = this.nodes.get(path)
     if (existing && existing.type !== 'file') {
-      throw new FsError('EISDIR', `Is a directory: ${path}`)
+      throw new FsError('EISDIR', path)
     }
     this.nodes.set(path, { type: 'file', content })
   }
 
   async mkdir(path: string): Promise<void> {
     if (this.nodes.has(path)) {
-      throw new FsError('EEXIST', `File exists: ${path}`)
+      throw new FsError('EEXIST', path)
     }
     this.nodes.set(path, { type: 'dir', content: '' })
   }
@@ -62,7 +63,7 @@ class MemoryBackend implements FsBackend {
   async remove(path: string): Promise<void> {
     const node = this.requireNode(path)
     if (node.type === 'dir' && [...this.nodes.keys()].some((key) => key.startsWith(path + '/'))) {
-      throw new FsError('ENOTEMPTY', `Directory not empty: ${path}`)
+      throw new FsError('ENOTEMPTY', path)
     }
     this.nodes.delete(path)
   }
@@ -80,7 +81,7 @@ class MemoryBackend implements FsBackend {
   private requireNode(path: string): { type: 'dir' | 'file'; content: string } {
     const node = this.nodes.get(path)
     if (!node) {
-      throw new FsError('ENOENT', `No such file or directory: ${path}`)
+      throw new FsError('ENOENT', path)
     }
     return node
   }
@@ -112,6 +113,7 @@ describe('system commands', () => {
   let harness: Harness
 
   beforeEach(async () => {
+    setLocale('zh-CN')
     harness = createContext()
     await harness.ctx.fs.init()
   })
@@ -147,7 +149,8 @@ describe('system commands', () => {
     const output = harness.streamed.join('\n')
     expect(output).toContain('sshd.service')
     expect(output).toContain('site19-storage-opfs.service')
-    expect(output).toContain('16 个运行中')
+    expect(output).toContain('site19-sra-telemetry.service')
+    expect(output).toContain('24 个运行中')
   })
 
   it('disk shows mount usage table', async () => {
@@ -155,6 +158,7 @@ describe('system commands', () => {
     const output = harness.streamed.join('\n')
     expect(output).toContain('挂载点')
     expect(output).toContain('62%')
+    expect(output).toContain('/srv/vault')
     expect(output).toContain('磁盘检查完成')
   })
 
@@ -164,6 +168,7 @@ describe('system commands', () => {
     expect(output).toContain('防火墙')
     expect(output).toContain('入侵检测系统')
     expect(output).toContain('E-11 小队')
+    expect(output).toContain('SRA-19-A')
     expect(output).toContain('安全扫描完成')
   })
 
@@ -171,7 +176,7 @@ describe('system commands', () => {
     await executeCommand('trace 1.2.3.4', harness.ctx)
     const output = harness.streamed.join('\n')
     expect(output).toContain('1  gateway.site19.local')
-    expect(output).toContain('12  1.2.3.4')
+    expect(output).toContain('15  1.2.3.4')
     expect(output).toContain('路径通畅')
   })
 
@@ -187,6 +192,7 @@ describe('system commands', () => {
     expect(output).toContain('█-5')
     expect(output).toContain('DATA EXPUNGED')
     expect(output).toContain('E-11 巡逻')
+    expect(output).toContain('SRA')
     expect(output).toContain('隔离区状态查询完成')
   })
 
@@ -195,7 +201,8 @@ describe('system commands', () => {
     const output = harness.streamed.join('\n')
     expect(output).toContain('site19-watchdog')
     expect(output).toContain('DATA EXPUNGED')
-    expect(output).toContain('24 条日志')
+    expect(output).toContain('site19-sra-telemetry')
+    expect(output).toContain('48 条日志')
   })
 
   it('appears in the command registry', async () => {

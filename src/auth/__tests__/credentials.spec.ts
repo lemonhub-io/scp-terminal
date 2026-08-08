@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '../../i18n'
 import { CredentialsError, MIN_PASSWORD_LENGTH, hasCredentials, register, verify } from '../credentials'
 import { mockGetDirectory } from '../../terminal/__tests__/mockOpfs'
 import type { MockDirHandle } from '../../terminal/__tests__/mockOpfs'
@@ -7,6 +8,7 @@ describe('credentials', () => {
   let root: MockDirHandle
 
   beforeEach(() => {
+    setLocale('en')
     vi.unstubAllGlobals()
     root = mockGetDirectory()
   })

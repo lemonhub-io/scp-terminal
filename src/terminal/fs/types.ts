@@ -1,11 +1,16 @@
+import { t } from '../../i18n'
+
 export type FsErrorCode = 'ENOENT' | 'EEXIST' | 'ENOTDIR' | 'EISDIR' | 'ENOTEMPTY'
 
 export class FsError extends Error {
   code: FsErrorCode
+  path: string
 
-  constructor(code: FsErrorCode, message: string) {
-    super(message)
+  constructor(code: FsErrorCode, path = '') {
+    super(t(`fs.errors.${code}`, { path }))
+    this.name = 'FsError'
     this.code = code
+    this.path = path
   }
 }
 

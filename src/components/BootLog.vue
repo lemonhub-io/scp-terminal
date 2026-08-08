@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { BOOT_LINES } from '../boot/bootLog'
+import { useI18n } from 'vue-i18n'
+import { getBootLines } from '../boot/bootLog'
 import type { BootLine } from '../boot/bootLog'
 import { playBootDone, playTick } from '../audio/sfx'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   finished: []
 }>()
 
+const bootLines = getBootLines()
 const visible = ref<BootLine[]>([])
 const done = ref(false)
 const exiting = ref(false)
@@ -32,8 +36,8 @@ function advance(): void {
   if (skip) {
     return
   }
-  if (index < BOOT_LINES.length) {
-    visible.value.push(BOOT_LINES[index]!)
+  if (index < bootLines.length) {
+    visible.value.push(bootLines[index]!)
     playTick()
     index++
     timer = setTimeout(advance, 20 + Math.random() * 60)
@@ -70,7 +74,7 @@ function onKeydown(): void {
   if (!finished) {
     skip = true
     clearTimer()
-    visible.value = [...BOOT_LINES]
+    visible.value = [...bootLines]
     done.value = true
     timer = setTimeout(startExit, 250)
   }
@@ -107,7 +111,7 @@ const LOGO = [
 <template>
   <div class="boot-screen" :class="{ leaving: exiting }" @animationend="onAnimationEnd">
     <pre class="logo">{{ LOGO }}</pre>
-    <p class="version">kernel {{ kernelVersion }} · scp-terminal 1.0.0</p>
+    <p class="version">{{ t('boot.version', { version: kernelVersion }) }}</p>
 
     <div ref="logEl" class="log">
       <div
@@ -121,12 +125,12 @@ const LOGO = [
       </div>
       <div v-if="done" class="line prompt-line">
         <span class="stamp">[ 0000.000000 ]</span>
-        <span class="text">{{ BOOT_LINES[BOOT_LINES.length - 1]!.text }}</span>
+        <span class="text">{{ bootLines[bootLines.length - 1]!.text }}</span>
         <span class="cursor">█</span>
       </div>
     </div>
 
-    <p class="skip-hint">Press any key to skip</p>
+    <p class="skip-hint">{{ t('boot.skipHint') }}</p>
   </div>
 </template>
 

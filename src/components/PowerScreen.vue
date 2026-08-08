@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { playPowerOn } from '../audio/sfx'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   start: []
@@ -36,7 +39,7 @@ function onStart(): void {
 <template>
   <div class="power-screen">
     <div class="power-inner">
-      <p class="brand">SITE-19 · ADMINISTRATION SYSTEM</p>
+      <p class="brand">{{ t('app.brand') }}</p>
       <button class="start-btn" type="button" @click="onStart">
         <svg
           class="power-icon"
@@ -52,9 +55,9 @@ function onStart(): void {
           <path d="M12 3v9" />
           <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
         </svg>
-        <span>START</span>
+        <span>{{ t('power.start') }}</span>
       </button>
-      <p class="hint">TAP TO BOOT</p>
+      <p class="hint">{{ t('power.hint') }}</p>
     </div>
   </div>
 </template>

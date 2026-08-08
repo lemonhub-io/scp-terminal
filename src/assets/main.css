@@ -8,3 +8,19 @@ body,
   color-scheme: dark;
   font-family: 'Cascadia Code', 'Cascadia Mono', Menlo, Monaco, 'Courier New', monospace;
 }
+
+/*
+ * Light Yves Klein Blue (IKB ≈ #002FA7) color grade.
+ * Fixed overlay — all views, zero hit-testing.
+ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 70% at 50% 45%, transparent 35%, rgba(0, 28, 110, 0.14) 100%),
+    rgba(0, 47, 167, 0.055);
+  mix-blend-mode: soft-light;
+}
