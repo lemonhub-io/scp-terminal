@@ -93,6 +93,54 @@ export default {
         usage: 'log',
         description: '显示站点最近日志',
       },
+      personnel: {
+        usage: 'personnel',
+        description: '查询当班值勤名册',
+      },
+      power: {
+        usage: 'power',
+        description: '查看机房配电与 UPS 状态',
+      },
+      climate: {
+        usage: 'climate',
+        description: '环控与生物隔离环境诊断',
+      },
+      cameras: {
+        usage: 'cameras',
+        description: '视频汇聚与摄像头状态',
+      },
+      access: {
+        usage: 'access',
+        description: '门禁与刷卡审计汇总',
+      },
+      sra: {
+        usage: 'sra',
+        description: '现实稳定锚遥测查询',
+      },
+      comms: {
+        usage: 'comms',
+        description: '站间通信与无线电诊断',
+      },
+      vault: {
+        usage: 'vault',
+        description: '异常物品库登记查询',
+      },
+      sensors: {
+        usage: 'sensors',
+        description: '设施传感器总线轮询',
+      },
+      backup: {
+        usage: 'backup',
+        description: '备份与快照任务状态',
+      },
+      ps: {
+        usage: 'ps',
+        description: '采样系统进程表',
+      },
+      memos: {
+        usage: 'memos',
+        description: '站点运行通报',
+      },
     },
   },
 } as const

@@ -6,6 +6,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import { applyDocumentLang, i18n, t } from './i18n'
+import { setupPwa } from './pwa'
 
 const app = createApp(App)
 
@@ -16,3 +17,5 @@ applyDocumentLang()
 document.title = t('app.title')
 
 app.mount('#app')
+setupPwa()
+

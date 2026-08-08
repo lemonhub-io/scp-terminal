@@ -52,4 +52,46 @@ export const systemCommands: Command[] = [
   defineCommand('log', async (_args, ctx) => {
     await ctx.stream(formatStreamLines('system.log.lines'))
   }),
+
+  // Extended Site-19 operations toolkit (realistic logs, light SCP redaction)
+  defineCommand('personnel', async (_args, ctx) => {
+    await ctx.stream(
+      formatTableStream('tools.personnel', [10, 14, 6, 10], {
+        user: ctx.user,
+      }),
+    )
+  }),
+  defineCommand('power', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.power.lines'))
+  }),
+  defineCommand('climate', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.climate.lines'))
+  }),
+  defineCommand('cameras', async (_args, ctx) => {
+    await ctx.stream(formatTableStream('tools.cameras', [18, 8, 6, 18]))
+  }),
+  defineCommand('access', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.access.lines'))
+  }),
+  defineCommand('sra', async (_args, ctx) => {
+    await ctx.stream(formatTableStream('tools.sra', [12, 10, 8, 12]))
+  }),
+  defineCommand('comms', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.comms.lines'))
+  }),
+  defineCommand('vault', async (_args, ctx) => {
+    await ctx.stream(formatTableStream('tools.vault', [12, 10, 10, 10]))
+  }),
+  defineCommand('sensors', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.sensors.lines'))
+  }),
+  defineCommand('backup', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.backup.lines'))
+  }),
+  defineCommand('ps', async (_args, ctx) => {
+    await ctx.stream(formatTableStream('tools.ps', [8, 10, 6, 8, 22]))
+  }),
+  defineCommand('memos', async (_args, ctx) => {
+    await ctx.stream(formatStreamLines('tools.memos.lines'))
+  }),
 ]

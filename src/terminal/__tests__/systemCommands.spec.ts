@@ -205,8 +205,106 @@ describe('system commands', () => {
     expect(output).toContain('48 条日志')
   })
 
+  it('personnel streams duty roster', async () => {
+    await executeCommand('personnel', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('值勤名册')
+    expect(output).toContain('E11-A')
+    expect(output).toContain('DATA EXPUNGED')
+  })
+
+  it('power streams plant electrical status', async () => {
+    await executeCommand('power', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('UPS')
+    expect(output).toContain('配电检查完成')
+  })
+
+  it('climate streams HVAC diagnostics', async () => {
+    await executeCommand('climate', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('HEPA')
+    expect(output).toContain('环控诊断完成')
+  })
+
+  it('cameras streams NVR status', async () => {
+    await executeCommand('cameras', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('128')
+    expect(output).toContain('视频系统检查完成')
+  })
+
+  it('access streams badge audit summary', async () => {
+    await executeCommand('access', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('门禁')
+    expect(output).toContain('门禁审计汇总完成')
+  })
+
+  it('sra streams reality anchor telemetry', async () => {
+    await executeCommand('sra', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('SRA-19-A')
+    expect(output).toContain('SRA 遥测查询完成')
+  })
+
+  it('comms streams inter-site links', async () => {
+    await executeCommand('comms', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('tunnel0')
+    expect(output).toContain('通信诊断完成')
+  })
+
+  it('vault streams registry table', async () => {
+    await executeCommand('vault', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('异常物品库')
+    expect(output).toContain('V-19-')
+    expect(output).toContain('DATA EXPUNGED')
+  })
+
+  it('sensors streams facility bus poll', async () => {
+    await executeCommand('sensors', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('传感器')
+    expect(output).toContain('传感器轮询完成')
+  })
+
+  it('backup streams job status', async () => {
+    await executeCommand('backup', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('备份')
+    expect(output).toContain('备份状态查询完成')
+  })
+
+  it('ps streams process sample', async () => {
+    await executeCommand('ps', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('systemd')
+    expect(output).toContain('scp-terminal')
+    expect(output).toContain('进程采样完成')
+  })
+
+  it('memos streams operations bulletins', async () => {
+    await executeCommand('memos', harness.ctx)
+    const output = harness.streamed.join('\n')
+    expect(output).toContain('MEMO-19-')
+    expect(output).toContain('DATA EXPUNGED')
+  })
+
   it('appears in the command registry', async () => {
-    await executeCommand('help', harness.ctx)
-    expect(harness.ctx.stdout).toBeDefined()
+    const helpLines: string[] = []
+    await executeCommand('help', {
+      ...harness.ctx,
+      stdout: (text) => {
+        helpLines.push(text)
+      },
+    })
+    const help = helpLines.join('\n')
+    expect(help).toContain('personnel')
+    expect(help).toContain('vault')
+    expect(help).toContain('sra')
+    expect(help).toContain('memos')
   })
 })
+

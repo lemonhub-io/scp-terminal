@@ -93,6 +93,54 @@ export default {
         usage: 'log',
         description: 'Show recent site logs',
       },
+      personnel: {
+        usage: 'personnel',
+        description: 'Query on-duty personnel roster',
+      },
+      power: {
+        usage: 'power',
+        description: 'Show plant power and UPS status',
+      },
+      climate: {
+        usage: 'climate',
+        description: 'Diagnose HVAC and bio-isolation climate',
+      },
+      cameras: {
+        usage: 'cameras',
+        description: 'Video aggregation and camera status',
+      },
+      access: {
+        usage: 'access',
+        description: 'Badge and door access audit summary',
+      },
+      sra: {
+        usage: 'sra',
+        description: 'Query Scranton Reality Anchor telemetry',
+      },
+      comms: {
+        usage: 'comms',
+        description: 'Diagnose inter-site links and radio',
+      },
+      vault: {
+        usage: 'vault',
+        description: 'Query anomalous item vault registry',
+      },
+      sensors: {
+        usage: 'sensors',
+        description: 'Poll facility sensor bus',
+      },
+      backup: {
+        usage: 'backup',
+        description: 'Show backup and snapshot job status',
+      },
+      ps: {
+        usage: 'ps',
+        description: 'Sample system process table',
+      },
+      memos: {
+        usage: 'memos',
+        description: 'Show site operations bulletins',
+      },
     },
   },
 } as const

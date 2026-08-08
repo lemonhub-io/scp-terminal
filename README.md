@@ -8,7 +8,7 @@
 
 - **开机仪式感** — Power 开机页(Start 按钮)→ 全屏 + 电源音 → systemd 风格开机日志滚动(逐行浮现 + 打字音)→ 登录页
 - **终端核心** — xterm.js + Campbell 配色 + Cascadia Code,OPFS 虚拟文件系统(FHS 结构,持久化)
-- **22 个命令** — 基础文件系统命令 + 9 个系统诊断命令,全部以滚动日志流输出(逐行定时浮现,`[ OK ]`/`[ WARN ]` 状态标记)
+- **34 个命令** — 基础文件系统命令 + 21 个站点诊断/运维命令,诊断类以滚动日志流输出(逐行定时浮现,`[ OK ]`/`[ WARN ]` 状态标记)
 - **移动端自定义键盘** — simple-keyboard 驱动,系统键盘完全替换,统一输入体验;极简暗色设计 + SVG 图标 + 按键音
 - **音频** — Web Audio 合成(零音频文件):电源音、日志打字音、键盘按键音
 - **SCP 叙事轻点缀** — `containment`(隔离区收容状态)、`log`(站点日志,含 redacted 条目)、`security` 中的收容单元/E-11 巡逻
@@ -60,12 +60,24 @@ npm run format               # prettier 格式化
 | `sysinfo` | 系统信息:内核 / CPU / 内存 / 固件 |
 | `check` | 全量健康检查 |
 | `network` | 网络诊断:接口 / 路由 / 加密隧道 / 延迟 |
-| `services` | systemd 服务列表(16 个) |
+| `services` | systemd 服务列表 |
 | `disk` | 磁盘挂载表 |
 | `security` | 安全扫描:防火墙 / 补丁 / 收容单元 / E-11 |
-| `trace <ip>` | 路由追踪(12 跳,默认 8.8.8.8) |
+| `trace <ip>` | 路由追踪(默认 8.8.8.8) |
 | `containment` | 隔离区收容状态查询 |
 | `log` | 站点日志查看(含 redacted 条目) |
+| `personnel` | 当班值勤名册(只读) |
+| `power` | 机房配电 / UPS / 发电机 |
+| `climate` | 环控 HVAC / 生物隔离 |
+| `cameras` | 视频汇聚与摄像头状态 |
+| `access` | 门禁与刷卡审计汇总 |
+| `sra` | 现实稳定锚(SRA)遥测 |
+| `comms` | 站间隧道与无线电 |
+| `vault` | 异常物品库登记 |
+| `sensors` | 设施传感器总线 |
+| `backup` | 备份与快照任务 |
+| `ps` | 进程表采样 |
+| `memos` | 站点运行通报 |
 
 ## 项目结构
 
