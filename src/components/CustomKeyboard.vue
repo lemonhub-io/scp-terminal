@@ -376,35 +376,28 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/*
+ * Full-bleed bottom dock — no max-width so tablets fill the width.
+ * contain + fixed key height avoid layout thrash / vertical jitter.
+ */
 .keyboard-shell {
-  flex: none;
+  flex: 0 0 auto;
+  align-self: stretch;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 10px max(10px, env(safe-area-inset-bottom));
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 0 max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-right));
   background: linear-gradient(180deg, #161618 0%, #121214 100%);
   border-top: 1px solid #2a2a2e;
   box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.32);
-  animation: kb-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   -webkit-user-select: none;
-}
-
-@keyframes kb-enter {
-  from {
-    transform: translateY(12px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .keyboard-shell {
-    animation: none;
-  }
+  /* Isolate from parent ResizeObserver thrash */
+  contain: layout style;
+  /* Stable footprint — do not animate height/transform after mount */
+  transform: translateZ(0);
 }
 
 .kb-bar {
@@ -504,11 +497,13 @@ onBeforeUnmount(() => {
   background: transparent;
   padding: 0 0 2px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 :deep(.kb-theme .hg-row) {
   display: flex;
-  justify-content: center;
+  justify-content: stretch;
+  width: 100%;
 }
 
 :deep(.kb-theme .hg-row:not(:last-child)) {
@@ -520,9 +515,12 @@ onBeforeUnmount(() => {
 }
 
 :deep(.kb-theme .hg-button) {
-  height: clamp(42px, 11.2vw, 48px);
-  flex-grow: 1;
-  max-width: 64px;
+  /* Fixed key height — avoid vw-based height that thrash with visualViewport */
+  height: 46px;
+  min-height: 46px;
+  flex: 1 1 0;
+  max-width: none;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -536,15 +534,16 @@ onBeforeUnmount(() => {
   color: #e6e6ea;
   font-family: 'Cascadia Code Variable', 'Cascadia Code', 'Cascadia Mono', Menlo, Monaco, 'Courier New',
     monospace;
-  font-size: clamp(14px, 3.8vw, 16px);
+  font-size: 15px;
   font-weight: 500;
   line-height: 1;
+  /* Only paint, not layout — prevents row height jitter on press */
   transition:
-    transform 0.05s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.05s ease,
     background 0.05s ease,
     border-color 0.05s ease,
-    color 0.05s ease;
+    color 0.05s ease,
+    box-shadow 0.05s ease,
+    filter 0.05s ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   cursor: pointer;
@@ -554,7 +553,8 @@ onBeforeUnmount(() => {
 :deep(.kb-theme .hg-button.hg-activeButton) {
   background: linear-gradient(180deg, #2a2a2f 0%, #242428 100%);
   border-color: rgba(22, 198, 12, 0.14);
-  transform: scale(0.96) translateY(1px);
+  /* No transform — scale/translateY reflowed the whole dock on some tablets */
+  filter: brightness(0.92);
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(22, 198, 12, 0.06);
@@ -570,19 +570,19 @@ onBeforeUnmount(() => {
   margin: auto;
 }
 
-/* Function keys: quieter surface */
+/* Function keys: quieter surface, slightly wider share */
 :deep(.kb-theme .hg-button.kb-btn-func) {
-  max-width: 72px;
-  flex-grow: 1.15;
+  flex: 1.25 1 0;
+  max-width: none;
   background: linear-gradient(180deg, #323238 0%, #27272c 100%);
   color: #b8b8c0;
-  font-size: clamp(12px, 3.2vw, 13px);
+  font-size: 13px;
 }
 
 /* Enter: subtle site green accent */
 :deep(.kb-theme .hg-button.kb-btn-enter) {
-  max-width: 76px;
-  flex-grow: 1.2;
+  flex: 1.3 1 0;
+  max-width: none;
   background: linear-gradient(180deg, #2a3a2a 0%, #1e2c1e 100%);
   border-color: rgba(22, 198, 12, 0.18);
   color: #7dca72;
@@ -593,13 +593,14 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #243424 0%, #1a261a 100%);
   border-color: rgba(22, 198, 12, 0.32);
   color: #9ae08f;
+  filter: brightness(1.05);
 }
 
-/* Space bar */
+/* Space bar — majority of bottom row */
 :deep(.kb-theme .hg-button.kb-btn-space) {
+  flex: 4.5 1 0;
   max-width: none;
-  flex-grow: 4.2;
-  min-width: 38%;
+  min-width: 0;
 }
 
 :deep(.kb-theme .hg-button.kb-btn-space::after) {
@@ -635,19 +636,27 @@ onBeforeUnmount(() => {
   color: #c4b44a;
 }
 
-/* Wider phones / tablets */
-@media (min-width: 480px) {
-  .keyboard-shell {
-    padding-left: 14px;
-    padding-right: 14px;
+/* Tablets / landscape: taller keys, still full width */
+@media (min-width: 600px) {
+  :deep(.kb-theme .hg-button) {
+    height: 50px;
+    min-height: 50px;
+    font-size: 16px;
   }
 
   :deep(.kb-theme .hg-row:not(:last-child)) {
-    margin-bottom: 7px;
+    margin-bottom: 8px;
   }
 
   :deep(.kb-theme .hg-row .hg-button:not(:last-child)) {
     margin-right: 6px;
+  }
+}
+
+@media (min-width: 900px) {
+  :deep(.kb-theme .hg-button) {
+    height: 52px;
+    min-height: 52px;
   }
 }
 </style>

@@ -143,6 +143,8 @@ function onKeydown(event: KeyboardEvent): void {
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
   background: #0c0c0c;
   color: #f2f2f2;
   font-family: 'Cascadia Code', 'Cascadia Mono', Menlo, Monaco, 'Courier New', monospace;

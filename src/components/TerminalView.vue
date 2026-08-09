@@ -30,6 +30,9 @@ let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
 let streamTimer: ReturnType<typeof setTimeout> | null = null
 let streamAbort = false
+let fitRaf = 0
+let lastFitW = 0
+let lastFitH = 0
 
 let fs: FsBackend | null = null
 let cwd = HOME_DIR
@@ -358,8 +361,34 @@ function replaceLine(text: string): void {
   term?.write(colorizeLine(text))
 }
 
+/**
+ * Debounced fit — avoids ResizeObserver ↔ xterm fit feedback loops that
+ * make the custom keyboard appear to bounce vertically on tablets.
+ */
+function scheduleFit(force = false): void {
+  if (fitRaf) {
+    cancelAnimationFrame(fitRaf)
+  }
+  fitRaf = requestAnimationFrame(() => {
+    fitRaf = 0
+    const el = container.value
+    if (!el || !fitAddon) {
+      return
+    }
+    const w = Math.round(el.clientWidth)
+    const h = Math.round(el.clientHeight)
+    // Ignore sub-pixel / 1–2px thrash from scrollbars or visualViewport chrome
+    if (!force && Math.abs(w - lastFitW) < 3 && Math.abs(h - lastFitH) < 3) {
+      return
+    }
+    lastFitW = w
+    lastFitH = h
+    fitAddon.fit()
+  })
+}
+
 function onResize(): void {
-  fitAddon?.fit()
+  scheduleFit()
 }
 
 function onKeyboardInput(key: string): void {
@@ -368,9 +397,9 @@ function onKeyboardInput(key: string): void {
 
 function hideKeyboard(): void {
   keyboardVisible.value = false
-  // Refit after keyboard leaves so rows expand
+  // One refit after dock collapses (not every frame)
   requestAnimationFrame(() => {
-    fitAddon?.fit()
+    scheduleFit(true)
     term?.focus()
   })
 }
@@ -378,7 +407,7 @@ function hideKeyboard(): void {
 function showKeyboard(): void {
   keyboardVisible.value = true
   requestAnimationFrame(() => {
-    fitAddon?.fit()
+    scheduleFit(true)
     term?.focus()
   })
 }
@@ -454,11 +483,13 @@ onMounted(async () => {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(container.value)
-  fitAddon.fit()
+  scheduleFit(true)
   term.focus()
 
   term.onData(handleData)
   window.addEventListener('resize', onResize)
+  // visualViewport changes (browser chrome) used to thrash fit() → keyboard bounce
+  window.visualViewport?.addEventListener('resize', onResize)
 
   if (isCoarse.value) {
     const helper = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')
@@ -470,6 +501,8 @@ onMounted(async () => {
       helper.readOnly = true
     }
     keyboardVisible.value = true
+    // Fit once after keyboard paints into flex layout
+    requestAnimationFrame(() => scheduleFit(true))
   }
 
   resizeObserver = new ResizeObserver(onResize)
@@ -493,6 +526,11 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
+  window.visualViewport?.removeEventListener('resize', onResize)
+  if (fitRaf) {
+    cancelAnimationFrame(fitRaf)
+    fitRaf = 0
+  }
   resizeObserver?.disconnect()
   resizeObserver = null
   streamAbort = true
@@ -530,6 +568,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100%;
   min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   background: #0c0c0c;
   opacity: 0;
   transition: opacity 0.28s ease;
