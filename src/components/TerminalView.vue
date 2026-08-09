@@ -33,6 +33,8 @@ let streamAbort = false
 let fitRaf = 0
 let lastFitW = 0
 let lastFitH = 0
+let touchScrollY: number | null = null
+let detachScrollHandlers: (() => void) | null = null
 
 let fs: FsBackend | null = null
 let cwd = HOME_DIR
@@ -395,6 +397,88 @@ function onKeyboardInput(key: string): void {
   term?.input(key)
 }
 
+/**
+ * xterm v6 relies on SmoothScrollableElement for wheel; under flex + custom
+ * keyboard layouts it often stops receiving events. Drive scrollLines ourselves.
+ */
+function attachScrollHandlers(...els: HTMLElement[]): void {
+  const onWheel = (ev: WheelEvent): void => {
+    if (!term || ev.ctrlKey) {
+      return
+    }
+    if (ev.deltaY === 0 && ev.deltaX === 0) {
+      return
+    }
+    const delta = Math.abs(ev.deltaY) >= Math.abs(ev.deltaX) ? ev.deltaY : 0
+    if (delta === 0) {
+      return
+    }
+    let lines: number
+    if (ev.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+      lines = Math.trunc(delta) || (delta > 0 ? 1 : -1)
+    } else if (ev.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      lines = Math.trunc(delta * (term.rows || 24)) || (delta > 0 ? 1 : -1)
+    } else {
+      lines = Math.trunc(delta / 18) || (delta > 0 ? 1 : -1)
+    }
+    // deltaY > 0 → scroll toward newer lines (down)
+    term.scrollLines(lines)
+    ev.preventDefault()
+    ev.stopPropagation()
+  }
+
+  const onTouchStart = (ev: TouchEvent): void => {
+    if (ev.touches.length !== 1) {
+      touchScrollY = null
+      return
+    }
+    touchScrollY = ev.touches[0]!.clientY
+  }
+
+  const onTouchMove = (ev: TouchEvent): void => {
+    if (!term || touchScrollY == null || ev.touches.length !== 1) {
+      return
+    }
+    const y = ev.touches[0]!.clientY
+    const dy = touchScrollY - y
+    // finger moving up → reveal older lines above → scrollLines negative
+    const threshold = 10
+    if (Math.abs(dy) < threshold) {
+      return
+    }
+    const lines = Math.round(dy / threshold)
+    if (lines !== 0) {
+      term.scrollLines(lines)
+      touchScrollY = y
+      ev.preventDefault()
+    }
+  }
+
+  const onTouchEnd = (): void => {
+    touchScrollY = null
+  }
+
+  const targets = [...new Set(els.filter(Boolean))]
+  for (const el of targets) {
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true })
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
+  }
+
+  detachScrollHandlers = () => {
+    for (const el of targets) {
+      el.removeEventListener('wheel', onWheel, true)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+    detachScrollHandlers = null
+  }
+}
+
 function hideKeyboard(): void {
   keyboardVisible.value = false
   // One refit after dock collapses (not every frame)
@@ -474,7 +558,10 @@ onMounted(async () => {
     cursorWidth: 1,
     convertEol: true,
     scrollback: 5000,
-    smoothScrollDuration: prefersReducedMotion() ? 0 : 80,
+    // Smooth scroll + custom dock layout was unreliable; keep wheel responsive
+    smoothScrollDuration: 0,
+    scrollSensitivity: 1,
+    fastScrollSensitivity: 5,
     allowTransparency: false,
     drawBoldTextInBrightColors: true,
     minimumContrastRatio: 1,
@@ -485,6 +572,26 @@ onMounted(async () => {
   term.open(container.value)
   scheduleFit(true)
   term.focus()
+
+  if (term.element) {
+    // Container + xterm root so wheel/touch work over padding and canvas
+    attachScrollHandlers(container.value, term.element)
+  }
+
+  term.attachCustomKeyEventHandler((ev) => {
+    if (ev.type !== 'keydown' || !term || busy || reverseSearch) {
+      return true
+    }
+    if (ev.key === 'PageUp') {
+      term.scrollLines(-(Math.max(1, term.rows - 2)))
+      return false
+    }
+    if (ev.key === 'PageDown') {
+      term.scrollLines(Math.max(1, term.rows - 2))
+      return false
+    }
+    return true
+  })
 
   term.onData(handleData)
   window.addEventListener('resize', onResize)
@@ -531,6 +638,7 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(fitRaf)
     fitRaf = 0
   }
+  detachScrollHandlers?.()
   resizeObserver?.disconnect()
   resizeObserver = null
   streamAbort = true
@@ -592,24 +700,39 @@ onBeforeUnmount(() => {
   background: #0c0c0c;
   padding: 12px 14px 10px;
   box-sizing: border-box;
-  /* Soft breathing room on large displays without shrinking columns too much */
   padding-left: max(14px, env(safe-area-inset-left));
   padding-right: max(14px, env(safe-area-inset-right));
   padding-top: max(12px, env(safe-area-inset-top));
+  /* Allow wheel/touch on this flex child */
+  touch-action: pan-y;
+  overflow: hidden;
+  position: relative;
 }
 
 .terminal-container :deep(.xterm) {
   height: 100%;
+  width: 100%;
   padding: 0;
+  touch-action: pan-y;
+}
+
+/* xterm v6 custom scrollbar host */
+.terminal-container :deep(.xterm-scrollable-element) {
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: pan-y;
 }
 
 .terminal-container :deep(.xterm-viewport) {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   scrollbar-width: thin;
   scrollbar-color: #2e2e2e transparent;
 }
 
 .terminal-container :deep(.xterm-viewport::-webkit-scrollbar) {
-  width: 7px;
+  width: 8px;
 }
 
 .terminal-container :deep(.xterm-viewport::-webkit-scrollbar-track) {
@@ -630,6 +753,12 @@ onBeforeUnmount(() => {
 
 .terminal-container :deep(.xterm-screen) {
   -webkit-font-smoothing: antialiased;
+  touch-action: pan-y;
+}
+
+/* Custom scrollbar slider (xterm v6) */
+.terminal-container :deep(.xterm-scrollable-element > .scrollbar) {
+  cursor: pointer;
 }
 
 .kb-show {
