@@ -3,7 +3,7 @@
 ## 验证命令(每次改动后必须运行)
 
 ```bash
-npm run test:unit -- --run   # 单元测试(当前 72 个)
+npm run test:unit -- --run   # 单元测试
 npm run build                # 类型检查 + 构建
 npm run lint                 # oxlint + eslint(--fix)
 ```
@@ -14,7 +14,8 @@ npm run lint                 # oxlint + eslint(--fix)
 ## 架构
 
 - **视图流程**(App.vue):`power` → `boot` → `login` → `terminal`,Vue Transition fade 切换
-- **命令系统**(terminal/):`shell.ts` 定义 `Command` 接口与执行器,基础命令英文输出;`systemCommands.ts` 追加诊断命令,中文输出,全部经 `ctx.stream()` 以滚动日志流呈现(逐行定时浮现,`[ OK ]`/`[ WARN ]` 行加长停顿)
+- **命令系统**(terminal/):`shell.ts` 定义 `Command` 接口与执行器(basic/text/system 分组);`systemCommands.ts` 诊断命令经 `ctx.stream()` 呈现,并 `appendSiteLog` 写入 `/var/log/site19/<cmd>.log`
+- **交互增强**:Tab 补全(命令/路径)、历史持久化、`Ctrl+R` 反向搜索;文本工具 `grep`/`head`/`tail`/`wc`
 - **键盘**(CustomKeyboard.vue):simple-keyboard 封装,**延迟初始化**——首次显示时才 `new SimpleKeyboard()`(挂载即初始化曾导致登录页黑屏;必须用具名导入 `{ SimpleKeyboard }`,默认导入在生产构建下不是构造函数)
 - **音频**(audio/sfx.ts):Web Audio 合成,`ensureAudio()` 幂等,必须在用户手势内初始化
 - **触摸设备**(composables/useTouch.ts):`matchMedia('(pointer: coarse)')` 检测,驱动键盘显示与系统键盘拦截

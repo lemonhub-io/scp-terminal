@@ -33,6 +33,7 @@ export const SEED_DIRS: string[] = [
   '/var/cache',
   '/var/lib',
   '/var/log',
+  '/var/log/site19',
   '/var/spool',
   '/var/tmp',
 ]

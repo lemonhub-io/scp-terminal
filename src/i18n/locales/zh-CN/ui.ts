@@ -15,13 +15,12 @@ export default {
     title: 'SCP 终端',
     registerTitle: '创建账户',
     loginTitle: '登录',
-    registerSubtitle: '首次运行 — 请创建用户名和密码',
-    loginSubtitle: '请输入用户名和密码',
+    registerSubtitle: '首次运行 — 请设置用户名（无需密码）',
+    loginSubtitle: '输入用户名以继续',
     username: '用户名',
-    password: '密码',
     usernamePlaceholder: 'user',
     working: '处理中...',
-    invalidCredentials: '用户名或密码错误',
+    invalidCredentials: '用户名不存在',
   },
   locale: {
     label: '语言',
@@ -31,6 +30,8 @@ export default {
   terminal: {
     storageInitFailed: '存储初始化失败: {error}',
     showKeyboard: '显示键盘',
+    reverseSearch: '(反向搜索)`{query}`:',
+    reverseSearchEmpty: '无匹配',
   },
   keyboard: {
     model: 'SITE19-KBD-01',
@@ -48,7 +49,6 @@ export default {
   auth: {
     errors: {
       empty_username: '用户名不能为空',
-      password_too_short: '密码至少需要 {min} 个字符',
       account_exists: '账户已存在',
     },
   },

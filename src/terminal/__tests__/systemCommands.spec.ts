@@ -136,6 +136,14 @@ describe('system commands', () => {
     expect(output).toContain('健康检查完成 — 系统状态良好')
   })
 
+  it('check appends a site log file', async () => {
+    await executeCommand('check', harness.ctx)
+    expect(await harness.ctx.fs.exists('/var/log/site19/check.log')).toBe(true)
+    const log = await harness.ctx.fs.read('/var/log/site19/check.log')
+    expect(log).toContain('健康检查')
+    expect(log).not.toContain('\x1b[')
+  })
+
   it('network streams interface diagnostics', async () => {
     await executeCommand('network', harness.ctx)
     const output = harness.streamed.join('\n')

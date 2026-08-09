@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '../../i18n'
-import { CredentialsError, MIN_PASSWORD_LENGTH, hasCredentials, register, verify } from '../credentials'
+import { CredentialsError, hasCredentials, register, verify, getStoredUsername } from '../credentials'
 import { mockGetDirectory } from '../../terminal/__tests__/mockOpfs'
 import type { MockDirHandle } from '../../terminal/__tests__/mockOpfs'
 
@@ -17,58 +17,61 @@ describe('credentials', () => {
     expect(await hasCredentials()).toBe(false)
   })
 
-  it('registers and verifies a user', async () => {
-    await register('alice', 'secret123')
+  it('registers and verifies a username only', async () => {
+    await register('alice')
     expect(await hasCredentials()).toBe(true)
-    expect(await verify('alice', 'secret123')).toBe(true)
+    expect(await verify('alice')).toBe(true)
+    expect(await getStoredUsername()).toBe('alice')
   })
 
-  it('rejects wrong username and password', async () => {
-    await register('alice', 'secret123')
-    expect(await verify('alice', 'wrongpass')).toBe(false)
-    expect(await verify('bob', 'secret123')).toBe(false)
+  it('rejects wrong username', async () => {
+    await register('alice')
+    expect(await verify('bob')).toBe(false)
   })
 
   it('trims the username', async () => {
-    await register('  alice  ', 'secret123')
-    expect(await verify('alice', 'secret123')).toBe(true)
-    expect(await verify('  alice  ', 'secret123')).toBe(true)
+    await register('  alice  ')
+    expect(await verify('alice')).toBe(true)
+    expect(await verify('  alice  ')).toBe(true)
   })
 
   it('rejects empty usernames', async () => {
-    await expect(register('  ', 'secret123')).rejects.toThrowError(CredentialsError)
-  })
-
-  it('rejects short passwords', async () => {
-    await expect(register('alice', 'abc'.repeat(MIN_PASSWORD_LENGTH - 3))).rejects.toThrowError(CredentialsError)
+    await expect(register('  ')).rejects.toThrowError(CredentialsError)
   })
 
   it('rejects duplicate registration', async () => {
-    await register('alice', 'secret123')
-    await expect(register('bob', 'otherpass')).rejects.toThrowError(/already exists/i)
+    await register('alice')
+    await expect(register('bob')).rejects.toThrowError(/already exists/i)
   })
 
-  it('does not store plaintext passwords', async () => {
-    await register('alice', 'secret123')
+  it('stores only username without password material', async () => {
+    await register('alice')
     const stored = readStored()
-    expect(stored).not.toBeNull()
-    expect(stored?.hash).not.toContain('secret123')
-    expect(stored?.hash).toMatch(/^[0-9a-f]{64}$/)
-    expect(stored?.salt).toMatch(/^[0-9a-f]{32}$/)
+    expect(stored).toEqual({ username: 'alice' })
+    expect(stored).not.toHaveProperty('hash')
+    expect(stored).not.toHaveProperty('salt')
   })
 
-  it('uses a random salt per registration', async () => {
-    await register('alice', 'secret123')
-    const first = readStored()
-    vi.unstubAllGlobals()
+  it('reads legacy files that still contain salt/hash', async () => {
     root = mockGetDirectory()
-    await register('bob', 'secret123')
-    const second = readStored()
-    expect(first?.salt).not.toBe(second?.salt)
+    const handle = await navigator.storage.getDirectory()
+    const file = await handle.getFileHandle('.scp-credentials.json', { create: true })
+    const w = await file.createWritable()
+    await w.write(
+      JSON.stringify({
+        username: 'legacy',
+        salt: 'aabbccdd',
+        hash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      }),
+    )
+    await w.close()
+    expect(await hasCredentials()).toBe(true)
+    expect(await verify('legacy')).toBe(true)
+    expect(await getStoredUsername()).toBe('legacy')
   })
 
-  function readStored(): { username: string; salt: string; hash: string } | null {
+  function readStored(): Record<string, unknown> | null {
     const entry = root.entry.children.get('.scp-credentials.json')
-    return entry ? (JSON.parse(entry.content) as { username: string; salt: string; hash: string }) : null
+    return entry ? (JSON.parse(entry.content) as Record<string, unknown>) : null
   }
 })

@@ -208,13 +208,55 @@ describe('shell', () => {
     expect(out.clearCalls).toBe(1)
   })
 
-  it('help lists all commands', async () => {
+  it('help lists commands by group', async () => {
     await executeCommand('help', out.ctx)
     const text = out.stdout.join('\n')
     expect(text).toContain('Available commands')
     expect(text).toContain('ls')
     expect(text).toContain('cd')
+    expect(text).toContain('grep')
+    expect(text).toContain('Site-19')
   })
+
+  it('help COMMAND shows a short manual', async () => {
+    await executeCommand('help containment', out.ctx)
+    const text = out.stdout.join('\n')
+    expect(text).toContain('containment')
+    expect(text).toMatch(/Usage|用法/)
+  })
+
+  it('grep filters lines', async () => {
+    await out.ctx.fs.write('/tmp/g.txt', 'alpha\nbeta\nalphabet\n')
+    out.stdout.length = 0
+    await executeCommand('grep alpha /tmp/g.txt', out.ctx)
+    const text = out.stdout.join('\n')
+    expect(text).toContain('alpha')
+    expect(text).toContain('alphabet')
+    expect(text.split('\n').some((l) => l === 'beta')).toBe(false)
+  })
+
+  it('head and tail respect -n', async () => {
+    await out.ctx.fs.write('/tmp/h.txt', 'L1\nL2\nL3')
+    out.stdout.length = 0
+    await executeCommand('head -n 2 /tmp/h.txt', out.ctx)
+    expect(out.stdout[0]).toBe('L1\nL2')
+    out.stdout.length = 0
+    await executeCommand('tail -n 1 /tmp/h.txt', out.ctx)
+    expect(out.stdout[0]).toBe('L3')
+  })
+
+  it('wc counts lines words bytes', async () => {
+    await out.ctx.fs.write('/tmp/w.txt', 'hello world\n')
+    out.stdout.length = 0
+    await executeCommand('wc -l /tmp/w.txt', out.ctx)
+    expect(out.stdout[0]).toMatch(/1/)
+  })
+
+  it('pipes into grep', async () => {
+    await executeCommand('echo one | grep one', out.ctx)
+    expect(out.stdout[0]).toBe('one')
+  })
+
 
   it('whoami and uname print identity', async () => {
     await executeCommand('whoami', out.ctx)

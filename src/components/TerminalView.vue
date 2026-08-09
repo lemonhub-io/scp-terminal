@@ -6,8 +6,10 @@ import '@xterm/xterm/css/xterm.css'
 import { HOME_DIR } from '../terminal/fs/paths'
 import { createBackend } from '../terminal/fs/createBackend'
 import type { FsBackend } from '../terminal/fs/types'
-import { executeCommand } from '../terminal/shell'
+import { executeCommand, getCommandNames } from '../terminal/shell'
 import type { CommandContext } from '../terminal/shell'
+import { completeLine } from '../terminal/completion'
+import { loadHistory, pushHistory, saveHistory } from '../terminal/historyStore'
 import CustomKeyboard from './CustomKeyboard.vue'
 import { useIsCoarse } from '../composables/useTouch'
 import { t } from '../i18n'
@@ -32,11 +34,14 @@ let streamAbort = false
 let fs: FsBackend | null = null
 let cwd = HOME_DIR
 let lineBuffer = ''
-const history: string[] = []
+let history: string[] = []
 let historyIndex = 0
 let commandQueue: Promise<void> = Promise.resolve()
 /** True while a command is executing (blocks typing, allows Ctrl+C). */
 let busy = false
+/** Reverse-i-search (Ctrl+R) state */
+let reverseSearch: { query: string; match: string } | null = null
+let tabPending = false
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -100,16 +105,74 @@ function printPrompt(): void {
   term?.write(prompt())
 }
 
+function persistHistory(): void {
+  if (!fs) {
+    return
+  }
+  void saveHistory(fs, history)
+}
+
+function exitReverseSearch(apply: boolean): void {
+  if (!reverseSearch) {
+    return
+  }
+  const match = reverseSearch.match
+  reverseSearch = null
+  // Clear the (reverse-i-search) line by redrawing prompt + buffer
+  term?.write('\r\x1b[2K')
+  term?.write(promptText())
+  if (apply && match) {
+    lineBuffer = match
+    term?.write(colorizeLine(match))
+  } else {
+    term?.write(colorizeLine(lineBuffer))
+  }
+}
+
+function paintReverseSearch(): void {
+  if (!reverseSearch) {
+    return
+  }
+  const label = t('terminal.reverseSearch', { query: reverseSearch.query })
+  const shown = reverseSearch.match || t('terminal.reverseSearchEmpty')
+  term?.write(`\r\x1b[2K\x1b[33m${label}\x1b[0m ${shown}`)
+}
+
+function updateReverseSearch(query: string): void {
+  if (!reverseSearch) {
+    return
+  }
+  reverseSearch.query = query
+  if (!query) {
+    reverseSearch.match = ''
+    paintReverseSearch()
+    return
+  }
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i]!.includes(query)) {
+      reverseSearch.match = history[i]!
+      paintReverseSearch()
+      return
+    }
+  }
+  reverseSearch.match = ''
+  paintReverseSearch()
+}
+
 function runCommand(): void {
+  if (reverseSearch) {
+    exitReverseSearch(true)
+  }
   const line = lineBuffer
   lineBuffer = ''
+  tabPending = false
 
   if (line.trim()) {
-    history.push(line)
+    history = pushHistory(history, line)
     historyIndex = history.length
+    persistHistory()
     write('\r\n')
   } else {
-    // Empty enter: just a fresh prompt line, no command work
     printPrompt()
     return
   }
@@ -131,6 +194,7 @@ function runCommand(): void {
         stderr: (text) => write(`\x1b[91m${text}\x1b[0m`),
         stream,
         clear: () => term?.clear(),
+        history,
       }
 
       await executeCommand(line, ctx)
@@ -143,13 +207,39 @@ function runCommand(): void {
   })
 }
 
+async function handleTab(): Promise<void> {
+  if (!fs || busy) {
+    return
+  }
+  const result = await completeLine(lineBuffer, cwd, fs, getCommandNames())
+  if (result.candidates.length > 1 && result.line === lineBuffer && tabPending) {
+    write('\r\n' + result.candidates.join('  ') + '\r\n')
+    term?.write(promptText())
+    term?.write(colorizeLine(lineBuffer))
+    tabPending = false
+    return
+  }
+  if (result.line !== lineBuffer) {
+    replaceLine(result.line)
+    tabPending = result.candidates.length > 1
+    return
+  }
+  if (result.candidates.length > 1) {
+    tabPending = true
+  }
+}
+
 function handleData(data: string): void {
   // Allow Ctrl+C even while busy
   if (data === '\u0003') {
     streamAbort = true
     clearStreamTimer()
+    if (reverseSearch) {
+      reverseSearch = null
+    }
     lineBuffer = ''
     busy = false
+    tabPending = false
     term?.write('^C')
     printPrompt()
     return
@@ -159,11 +249,66 @@ function handleData(data: string): void {
     return
   }
 
+  // Ctrl+R reverse search
+  if (data === '\u0012') {
+    if (!reverseSearch) {
+      reverseSearch = { query: '', match: '' }
+      paintReverseSearch()
+    } else if (reverseSearch.query) {
+      // Find older match
+      const q = reverseSearch.query
+      const current = reverseSearch.match
+      let found = false
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i] === current) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (history[j]!.includes(q)) {
+              reverseSearch.match = history[j]!
+              found = true
+              break
+            }
+          }
+          break
+        }
+      }
+      if (!found) {
+        updateReverseSearch(q)
+      } else {
+        paintReverseSearch()
+      }
+    }
+    return
+  }
+
+  if (reverseSearch) {
+    if (data === '\r') {
+      exitReverseSearch(true)
+      return
+    }
+    if (data === '\u001b' || data === '\u001b[A' || data === '\u001b[B') {
+      exitReverseSearch(false)
+      return
+    }
+    if (data === '\u007f') {
+      updateReverseSearch(reverseSearch.query.slice(0, -1))
+      return
+    }
+    if (data.length === 1 && data.charCodeAt(0) >= 32) {
+      updateReverseSearch(reverseSearch.query + data)
+    }
+    return
+  }
+
   if (data === '\r') {
     runCommand()
     return
   }
+  if (data === '\t') {
+    void handleTab()
+    return
+  }
   if (data === '\u007f') {
+    tabPending = false
     if (lineBuffer.length > 0) {
       lineBuffer = lineBuffer.slice(0, -1)
       term?.write('\b \b')
@@ -171,6 +316,7 @@ function handleData(data: string): void {
     return
   }
   if (data === '\u001b[A') {
+    tabPending = false
     if (historyIndex > 0) {
       historyIndex--
       replaceLine(history[historyIndex] ?? '')
@@ -178,6 +324,7 @@ function handleData(data: string): void {
     return
   }
   if (data === '\u001b[B') {
+    tabPending = false
     if (historyIndex < history.length) {
       historyIndex++
       replaceLine(history[historyIndex] ?? '')
@@ -186,13 +333,13 @@ function handleData(data: string): void {
   }
 
   // Ignore most control chars / paste noise that isn't printable
-  if (data.length === 1 && data.charCodeAt(0) < 32 && data !== '\t') {
+  if (data.length === 1 && data.charCodeAt(0) < 32) {
     return
   }
 
+  tabPending = false
   lineBuffer += data
   const isCommandSegment = !lineBuffer.includes(' ')
-  // Command token: soft amber; rest of line stays default
   term?.write(isCommandSegment ? `\x1b[38;2;200;175;80m${data}\x1b[0m` : data)
 }
 
@@ -329,8 +476,10 @@ onMounted(async () => {
   resizeObserver.observe(container.value)
 
   createBackend()
-    .then((backend) => {
+    .then(async (backend) => {
       fs = backend
+      history = await loadHistory(backend)
+      historyIndex = history.length
       term?.write(promptText())
       ready.value = true
     })

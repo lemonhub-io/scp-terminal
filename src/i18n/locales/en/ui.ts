@@ -15,13 +15,12 @@ export default {
     title: 'SCP Terminal',
     registerTitle: 'Set up your account',
     loginTitle: 'Sign in',
-    registerSubtitle: 'First run — create a username and password',
-    loginSubtitle: 'Enter your username and password',
+    registerSubtitle: 'First run — choose a username (no password)',
+    loginSubtitle: 'Enter your username to continue',
     username: 'Username',
-    password: 'Password',
     usernamePlaceholder: 'user',
     working: 'Working...',
-    invalidCredentials: 'Invalid username or password',
+    invalidCredentials: 'Unknown username',
   },
   locale: {
     label: 'Language',
@@ -31,6 +30,8 @@ export default {
   terminal: {
     storageInitFailed: 'Failed to initialize storage: {error}',
     showKeyboard: 'Show keyboard',
+    reverseSearch: '(reverse-i-search)`{query}`:',
+    reverseSearchEmpty: 'failed',
   },
   keyboard: {
     model: 'SITE19-KBD-01',
@@ -48,7 +49,6 @@ export default {
   auth: {
     errors: {
       empty_username: 'Username must not be empty',
-      password_too_short: 'Password must be at least {min} characters',
       account_exists: 'Account already exists',
     },
   },

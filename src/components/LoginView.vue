@@ -18,15 +18,14 @@ const emit = defineEmits<{
 }>()
 
 const username = ref('')
-const password = ref('')
 const error = ref('')
 const busy = ref(false)
-const activeField = ref<'username' | 'password' | null>(null)
+const activeField = ref<'username' | null>(null)
 const loginBox = ref<HTMLElement | null>(null)
 const screenEl = ref<HTMLElement | null>(null)
 
-function focusField(field: 'username' | 'password'): void {
-  activeField.value = field
+function focusField(): void {
+  activeField.value = 'username'
 }
 
 onMounted(() => {
@@ -54,37 +53,33 @@ const subtitle = computed(() =>
 )
 
 function onKeyboardInput(key: string): void {
-  if (!activeField.value) {
+  if (activeField.value !== 'username') {
     return
   }
-  const target = activeField.value === 'username' ? username : password
   if (key === '\u007f') {
-    target.value = target.value.slice(0, -1)
+    username.value = username.value.slice(0, -1)
     return
   }
   if (key === '\r') {
-    if (activeField.value === 'password') {
-      activeField.value = null
-      void submit()
-    } else {
-      activeField.value = 'password'
-    }
+    activeField.value = null
+    void submit()
     return
   }
-  target.value += key
+  username.value += key
 }
 
 async function submit(): Promise<void> {
   error.value = ''
   busy.value = true
   try {
+    const name = username.value.trim()
     if (props.mode === 'register') {
-      await register(username.value, password.value)
-      emit('authenticated', username.value.trim())
+      await register(name)
+      emit('authenticated', name)
     } else {
-      const ok = await verify(username.value, password.value)
+      const ok = await verify(name)
       if (ok) {
-        emit('authenticated', username.value.trim())
+        emit('authenticated', name)
       } else {
         error.value = t('login.invalidCredentials')
       }
@@ -120,24 +115,8 @@ function onKeydown(event: KeyboardEvent): void {
             :placeholder="t('login.usernamePlaceholder')"
             :readonly="isCoarse"
             :disabled="busy"
-            @click="focusField('username')"
-            @focus="focusField('username')"
-            @keydown="onKeydown"
-          />
-        </label>
-
-        <label class="field">
-          <span class="label">{{ t('login.password') }}</span>
-          <input
-            v-model="password"
-            class="input"
-            type="password"
-            autocomplete="current-password"
-            placeholder="••••••••"
-            :readonly="isCoarse"
-            :disabled="busy"
-            @click="focusField('password')"
-            @focus="focusField('password')"
+            @click="focusField"
+            @focus="focusField"
             @keydown="onKeydown"
           />
         </label>
@@ -165,7 +144,7 @@ function onKeydown(event: KeyboardEvent): void {
   flex-direction: column;
   height: 100%;
   background: #0c0c0c;
-  color: #fff;
+  color: #f2f2f2;
   font-family: 'Cascadia Code', 'Cascadia Mono', Menlo, Monaco, 'Courier New', monospace;
 }
 
@@ -219,7 +198,7 @@ function onKeydown(event: KeyboardEvent): void {
   background: #222222;
   border: 1px solid #555;
   border-radius: 4px;
-  color: #fff;
+  color: #f2f2f2;
   font-family: inherit;
   font-size: 14px;
   padding: 8px 10px;

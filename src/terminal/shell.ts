@@ -16,12 +16,17 @@ export interface CommandContext {
   stderr: (text: string) => void
   stream: (text: string) => Promise<void>
   clear: () => void
+  /** Optional command history for `history` builtin */
+  history?: string[]
 }
+
+export type CommandGroup = 'basic' | 'text' | 'system'
 
 export interface Command {
   name: string
   usage: string
   description: string
+  group: CommandGroup
   run: (args: string[], ctx: CommandContext) => Promise<void> | void
 }
 
@@ -37,9 +42,10 @@ interface Segment {
   redirect: { path: string; append: boolean } | null
 }
 
-function defineCommand(name: string, run: Command['run']): Command {
+function defineCommand(name: string, group: CommandGroup, run: Command['run']): Command {
   return {
     name,
+    group,
     get usage() {
       return t(`shell.cmd.${name}.usage`)
     },
@@ -50,11 +56,25 @@ function defineCommand(name: string, run: Command['run']): Command {
   }
 }
 
+function readTextSource(ctx: CommandContext, pathOrEmpty: string | undefined): Promise<string> {
+  if (!pathOrEmpty) {
+    return Promise.resolve(ctx.stdin.replace(/\n$/, ''))
+  }
+  const resolved = abs(ctx.cwd, pathOrEmpty)
+  if (isLivePath(resolved)) {
+    const live = readLiveFile(resolved)
+    if (live != null) {
+      return Promise.resolve(live.replace(/\n$/, ''))
+    }
+  }
+  return ctx.fs.read(resolved).then((c) => c.replace(/\n$/, ''))
+}
+
 const commands: Command[] = [
-  defineCommand('pwd', (_args, ctx) => {
+  defineCommand('pwd', 'basic', (_args, ctx) => {
     ctx.stdout(ctx.cwd)
   }),
-  defineCommand('ls', async (args, ctx) => {
+  defineCommand('ls', 'basic', async (args, ctx) => {
     const { flags, positionals } = parseOptions(args)
     const showAll = flags.has('-a')
     const long = flags.has('-l')
@@ -77,7 +97,7 @@ const commands: Command[] = [
     }
     ctx.stdout(entries.map((e) => (e.type === 'dir' ? e.name + '/' : e.name)).join('  ') || '.')
   }),
-  defineCommand('cd', async (args, ctx) => {
+  defineCommand('cd', 'basic', async (args, ctx) => {
     const path = abs(ctx.cwd, args[0] ?? HOME_DIR)
     const stat = await ctx.fs.stat(path)
     if (stat.type !== 'dir') {
@@ -85,7 +105,7 @@ const commands: Command[] = [
     }
     ctx.cwd = path
   }),
-  defineCommand('cat', async (args, ctx) => {
+  defineCommand('cat', 'text', async (args, ctx) => {
     if (args.length === 0) {
       ctx.stdout(ctx.stdin.replace(/\n$/, ''))
       return
@@ -103,12 +123,12 @@ const commands: Command[] = [
       ctx.stdout(content.replace(/\n$/, ''))
     }
   }),
-  defineCommand('echo', (args, ctx) => {
+  defineCommand('echo', 'text', (args, ctx) => {
     const { flags, positionals } = parseOptions(args)
     void flags
     ctx.stdout(positionals.join(' '))
   }),
-  defineCommand('mkdir', async (args, ctx) => {
+  defineCommand('mkdir', 'basic', async (args, ctx) => {
     const parent = args[0] === '-p'
     const paths = parent ? args.slice(1) : args
     for (const p of paths) {
@@ -120,7 +140,7 @@ const commands: Command[] = [
       }
     }
   }),
-  defineCommand('touch', async (args, ctx) => {
+  defineCommand('touch', 'basic', async (args, ctx) => {
     for (const file of args) {
       const resolved = abs(ctx.cwd, file)
       if (await ctx.fs.exists(resolved)) {
@@ -129,7 +149,7 @@ const commands: Command[] = [
       await ctx.fs.write(resolved, '')
     }
   }),
-  defineCommand('rm', async (args, ctx) => {
+  defineCommand('rm', 'basic', async (args, ctx) => {
     const recursive = args.includes('-r')
     const force = args.includes('-f')
     const paths = args.filter((a) => !a.startsWith('-'))
@@ -149,20 +169,131 @@ const commands: Command[] = [
       }
     }
   }),
-  defineCommand('clear', (_args, ctx) => {
+  defineCommand('clear', 'basic', (_args, ctx) => {
     ctx.clear()
   }),
-  defineCommand('help', (_args, ctx) => {
-    const lines = commands.map((c) => `  ${c.usage.padEnd(22)} ${c.description}`)
-    ctx.stdout([t('shell.availableCommands'), ...lines, ''].join('\n'))
+  defineCommand('grep', 'text', async (args, ctx) => {
+    const { flags, positionals } = parseOptions(args)
+    const ignoreCase = flags.has('-i')
+    const pattern = positionals[0]
+    if (!pattern) {
+      throw new Error(t('shell.grep.needPattern'))
+    }
+    const files = positionals.slice(1)
+    let re: RegExp
+    try {
+      re = new RegExp(pattern, ignoreCase ? 'i' : '')
+    } catch {
+      throw new Error(t('shell.grep.badPattern'))
+    }
+    const sources = files.length > 0 ? files : [undefined]
+    const multi = files.length > 1
+    for (const file of sources) {
+      const text = await readTextSource(ctx, file)
+      const lines = text.split('\n')
+      for (const line of lines) {
+        if (re.test(line)) {
+          ctx.stdout(multi && file ? `${file}:${line}` : line)
+        }
+      }
+    }
   }),
-  defineCommand('date', (_args, ctx) => {
+  defineCommand('head', 'text', async (args, ctx) => {
+    const { n, positionals } = parseLineCount(args, 10)
+    const text = await readTextSource(ctx, positionals[0])
+    const lines = text === '' ? [] : text.split('\n')
+    ctx.stdout(lines.slice(0, n).join('\n'))
+  }),
+  defineCommand('tail', 'text', async (args, ctx) => {
+    const { n, positionals } = parseLineCount(args, 10)
+    const text = await readTextSource(ctx, positionals[0])
+    const lines = text === '' ? [] : text.split('\n')
+    ctx.stdout(lines.slice(-n).join('\n'))
+  }),
+  defineCommand('wc', 'text', async (args, ctx) => {
+    const { flags, positionals } = parseOptions(args)
+    const only =
+      flags.has('-l') || flags.has('-w') || flags.has('-c')
+        ? { l: flags.has('-l'), w: flags.has('-w'), c: flags.has('-c') }
+        : { l: true, w: true, c: true }
+
+    const files = positionals.length > 0 ? positionals : [undefined]
+    const rows: string[] = []
+    for (const file of files) {
+      const text = await readTextSource(ctx, file)
+      const lineCount = text === '' ? 0 : text.split('\n').length
+      const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length
+      const chars = text.length
+      const cols: string[] = []
+      if (only.l) {
+        cols.push(String(lineCount).padStart(8))
+      }
+      if (only.w) {
+        cols.push(String(words).padStart(8))
+      }
+      if (only.c) {
+        cols.push(String(chars).padStart(8))
+      }
+      if (file) {
+        cols.push(file)
+      }
+      rows.push(cols.join(' '))
+    }
+    ctx.stdout(rows.join('\n'))
+  }),
+  defineCommand('help', 'basic', (args, ctx) => {
+    const topic = args[0]
+    if (topic) {
+      const cmd = commandByName.get(topic)
+      if (!cmd) {
+        ctx.stderr(t('shell.help.unknown', { name: topic }))
+        return
+      }
+      const manKey = `shell.cmd.${topic}.man`
+      const man = t(manKey)
+      const body = man === manKey ? cmd.description : man
+      ctx.stdout([`${cmd.name} — ${cmd.description}`, '', t('shell.help.usage', { usage: cmd.usage }), '', body, ''].join('\n'))
+      return
+    }
+
+    const groups: { id: CommandGroup; title: string }[] = [
+      { id: 'basic', title: t('shell.help.group.basic') },
+      { id: 'text', title: t('shell.help.group.text') },
+      { id: 'system', title: t('shell.help.group.system') },
+    ]
+    const lines: string[] = [t('shell.availableCommands'), '']
+    for (const g of groups) {
+      const list = commands.filter((c) => c.group === g.id)
+      if (list.length === 0) {
+        continue
+      }
+      lines.push(g.title)
+      for (const c of list) {
+        lines.push(`  ${c.usage.padEnd(24)} ${c.description}`)
+      }
+      lines.push('')
+    }
+    lines.push(t('shell.help.hintDetail'))
+    ctx.stdout(lines.join('\n'))
+  }),
+  defineCommand('history', 'basic', (args, ctx) => {
+    const hist = ctx.history
+    if (!hist || hist.length === 0) {
+      ctx.stdout(t('shell.history.empty'))
+      return
+    }
+    const n = args[0] && /^\d+$/.test(args[0]) ? Number(args[0]) : hist.length
+    const slice = hist.slice(-n)
+    const start = hist.length - slice.length
+    ctx.stdout(slice.map((line, i) => `  ${String(start + i + 1).padStart(4)}  ${line}`).join('\n'))
+  }),
+  defineCommand('date', 'basic', (_args, ctx) => {
     ctx.stdout(formatUtcDateTime(new Date()))
   }),
-  defineCommand('whoami', (_args, ctx) => {
+  defineCommand('whoami', 'basic', (_args, ctx) => {
     ctx.stdout(ctx.user)
   }),
-  defineCommand('uname', (args, ctx) => {
+  defineCommand('uname', 'basic', (args, ctx) => {
     const all = args.includes('-a')
     const fields: string[] = []
     if (all || args.includes('-s')) {
@@ -186,6 +317,10 @@ const commandByName = new Map(commands.map((c) => [c.name, c]))
 
 export function getCommands(): Command[] {
   return commands
+}
+
+export function getCommandNames(): string[] {
+  return commands.map((c) => c.name).sort()
 }
 
 export async function executeCommand(line: string, ctx: CommandContext): Promise<void> {
@@ -376,6 +511,30 @@ function parseOptions(args: string[]): { flags: Set<string>; positionals: string
     }
   }
   return { flags, positionals }
+}
+
+/** Parse -n N / -nN style line counts for head/tail. */
+function parseLineCount(args: string[], defaultN: number): { n: number; positionals: string[] } {
+  let n = defaultN
+  const positionals: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!
+    if (a === '-n' && args[i + 1] && /^\d+$/.test(args[i + 1]!)) {
+      n = Number(args[i + 1])
+      i++
+      continue
+    }
+    const m = a.match(/^-n(\d+)$/)
+    if (m) {
+      n = Number(m[1])
+      continue
+    }
+    if (a.startsWith('-') && a.length > 1) {
+      continue
+    }
+    positionals.push(a)
+  }
+  return { n, positionals }
 }
 
 function abs(cwd: string, path: string): string {
