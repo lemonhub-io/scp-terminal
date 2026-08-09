@@ -157,8 +157,9 @@ describe('system commands', () => {
     await executeCommand('disk', harness.ctx)
     const output = harness.streamed.join('\n')
     expect(output).toContain('挂载点')
-    expect(output).toContain('62%')
+    expect(output).toMatch(/\d+%/)
     expect(output).toContain('/srv/vault')
+    expect(output).toContain('/dev/vda1')
     expect(output).toContain('磁盘检查完成')
   })
 

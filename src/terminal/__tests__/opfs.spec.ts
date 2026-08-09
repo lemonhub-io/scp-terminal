@@ -21,7 +21,7 @@ describe('OpfsBackend', () => {
     expect(await fs.exists('/usr/bin')).toBe(true)
     expect(await fs.exists('/var/log')).toBe(true)
     expect(await fs.exists('/proc')).toBe(true)
-    expect(await fs.read('/etc/hostname')).toBe('localhost')
+    expect(await fs.read('/etc/hostname')).toBe('site19-admin-01\n')
     expect(await fs.read('/etc/passwd')).toContain('user:x:1000:1000')
   })
 
@@ -75,8 +75,8 @@ describe('OpfsBackend', () => {
   })
 
   it('stat returns entry types', async () => {
-    expect(await fs.stat('/tmp')).toEqual({ name: 'tmp', type: 'dir', size: 4096 })
+    expect(await fs.stat('/tmp')).toMatchObject({ name: 'tmp', type: 'dir', size: 4096 })
     expect(await fs.stat('/home/user/notes.txt')).toMatchObject({ name: 'notes.txt', type: 'file' })
-    expect(await fs.stat('/')).toEqual({ name: '/', type: 'dir', size: 4096 })
+    expect(await fs.stat('/')).toMatchObject({ name: '/', type: 'dir', size: 4096 })
   })
 })

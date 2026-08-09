@@ -1,7 +1,10 @@
 import { t } from '../i18n'
+import { SITE } from '../site/identity'
+import { formatLsMtime, formatUtcDateTime } from '../utils/time'
 import { FsError } from './fs/types'
 import type { FsBackend } from './fs/types'
 import { HOME_DIR, resolvePath } from './fs/paths'
+import { isLivePath, readLiveFile } from './liveFs'
 import { systemCommands } from './systemCommands'
 
 export interface CommandContext {
@@ -59,10 +62,15 @@ const commands: Command[] = [
     const path = abs(ctx.cwd, positionals[0] ?? '.')
     const entries = (await ctx.fs.list(path)).filter((e) => showAll || !e.name.startsWith('.'))
     if (long) {
+      const owner = ctx.user || 'user'
       const rows = entries.map((e) => {
         const perm = e.type === 'dir' ? 'drwxr-xr-x' : '-rw-r--r--'
         const size = human ? humanizeSize(e.size) : String(e.size)
-        return `${perm}  1 user user ${size.padStart(8)} Aug  7 02:00 ${e.name}`
+        const mtime = formatLsMtime(e.mtimeMs != null ? new Date(e.mtimeMs) : new Date())
+        // root-owned system paths vs home files
+        const isSystem = path === '/' || path.startsWith('/etc') || path.startsWith('/proc') || path.startsWith('/var')
+        const user = isSystem && !path.startsWith('/home') ? 'root' : owner
+        return `${perm}  1 ${user.padEnd(8)} ${user.padEnd(8)} ${size.padStart(8)} ${mtime} ${e.name}`
       })
       ctx.stdout(rows.join('\n') || '.')
       return
@@ -83,7 +91,15 @@ const commands: Command[] = [
       return
     }
     for (const file of args) {
-      const content = await ctx.fs.read(abs(ctx.cwd, file))
+      const resolved = abs(ctx.cwd, file)
+      if (isLivePath(resolved)) {
+        const live = readLiveFile(resolved)
+        if (live != null) {
+          ctx.stdout(live.replace(/\n$/, ''))
+          continue
+        }
+      }
+      const content = await ctx.fs.read(resolved)
       ctx.stdout(content.replace(/\n$/, ''))
     }
   }),
@@ -141,7 +157,7 @@ const commands: Command[] = [
     ctx.stdout([t('shell.availableCommands'), ...lines, ''].join('\n'))
   }),
   defineCommand('date', (_args, ctx) => {
-    ctx.stdout(new Date().toLocaleString())
+    ctx.stdout(formatUtcDateTime(new Date()))
   }),
   defineCommand('whoami', (_args, ctx) => {
     ctx.stdout(ctx.user)
@@ -150,16 +166,16 @@ const commands: Command[] = [
     const all = args.includes('-a')
     const fields: string[] = []
     if (all || args.includes('-s')) {
-      fields.push('SCP-Terminal')
+      fields.push(SITE.product)
     }
     if (all || args.includes('-n')) {
-      fields.push('localhost')
+      fields.push(SITE.hostname)
     }
     if (all || args.includes('-r')) {
-      fields.push('6.8.0-scp')
+      fields.push(SITE.kernel)
     }
     if (fields.length === 0) {
-      fields.push('SCP-Terminal')
+      fields.push(SITE.product)
     }
     ctx.stdout(fields.join(' '))
   }),

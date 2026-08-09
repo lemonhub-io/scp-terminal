@@ -1,4 +1,5 @@
 import { tm } from '../i18n'
+import { expandTimePlaceholders } from '../utils/time'
 
 export type BootLineKind = 'kernel' | 'info' | 'ok' | 'fail' | 'target' | 'redacted' | 'prompt'
 
@@ -7,10 +8,12 @@ export interface BootLine {
   kind: BootLineKind
 }
 
-/** Localized boot sequence for the current locale. */
+/** Localized boot sequence for the current locale (times expanded at call). */
 export function getBootLines(): BootLine[] {
   const lines = tm<BootLine[]>('boot.lines')
-  return Array.isArray(lines) ? lines.map((line) => ({ kind: line.kind, text: line.text })) : []
+  return Array.isArray(lines)
+    ? lines.map((line) => ({ kind: line.kind, text: expandTimePlaceholders(line.text) }))
+    : []
 }
 
 /**

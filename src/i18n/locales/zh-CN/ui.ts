@@ -64,4 +64,12 @@ export default {
   seed: {
     notes: '- 使用 "cd /tmp" 探索目录\n- 使用 "mkdir" 和 "touch" 创建文件\n',
   },
+  time: {
+    uptime: {
+      withDays: '{days} 天 {hours} 小时 {minutes} 分钟',
+      withHours: '{hours} 小时 {minutes} 分钟 {seconds} 秒',
+      withMinutes: '{minutes} 分钟 {seconds} 秒',
+      secondsOnly: '{seconds} 秒',
+    },
+  },
 } as const

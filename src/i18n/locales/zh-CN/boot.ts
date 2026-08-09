@@ -73,7 +73,7 @@ const lines: BootLineMsg[] = [
   { kind: 'target', text: '已到达目标 网络已在线。' },
   { kind: 'redacted', text: '正在建立到 ██████████ 的安全上行链路 ...' },
   { kind: 'ok', text: '上行链路 ██████████ 已建立。' },
-  { kind: 'info', text: '正在将系统时间设为 2026-08-07 02:00:00 UTC ...' },
+  { kind: 'info', text: '正在将系统时间设为 {nowStamp} UTC ...' },
   { kind: 'ok', text: '已将系统时钟与硬件时钟同步。' },
   { kind: 'info', text: '正在启动用户管理器 (uid=1000) ...' },
   { kind: 'ok', text: '已启动用户管理器 (uid=1000)。' },

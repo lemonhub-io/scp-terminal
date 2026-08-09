@@ -11,6 +11,7 @@ import type { CommandContext } from '../terminal/shell'
 import CustomKeyboard from './CustomKeyboard.vue'
 import { useIsCoarse } from '../composables/useTouch'
 import { t } from '../i18n'
+import { SITE } from '../site/identity'
 
 const isCoarse = useIsCoarse()
 const keyboardVisible = ref(false)
@@ -37,8 +38,6 @@ let commandQueue: Promise<void> = Promise.resolve()
 /** True while a command is executing (blocks typing, allows Ctrl+C). */
 let busy = false
 
-const HOST = 'localhost'
-
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
@@ -49,7 +48,7 @@ function formatCwd(): string {
 
 function promptText(): string {
   // user@host dim · path cyan · prompt soft white
-  return `\x1b[38;2;140;140;140m${props.username}@${HOST}\x1b[0m:\x1b[96m${formatCwd()}\x1b[0m\x1b[38;2;220;220;220m$\x1b[0m `
+  return `\x1b[38;2;140;140;140m${props.username}@${SITE.hostname}\x1b[0m:\x1b[96m${formatCwd()}\x1b[0m\x1b[38;2;220;220;220m$\x1b[0m `
 }
 
 function prompt(): string {

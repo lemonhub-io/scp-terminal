@@ -64,4 +64,12 @@ export default {
   seed: {
     notes: '- Use "cd /tmp" to explore\n- Use "mkdir" and "touch" to create files\n',
   },
+  time: {
+    uptime: {
+      withDays: '{days} days {hours} hours {minutes} minutes',
+      withHours: '{hours} hours {minutes} minutes {seconds} seconds',
+      withMinutes: '{minutes} minutes {seconds} seconds',
+      secondsOnly: '{seconds} seconds',
+    },
+  },
 } as const

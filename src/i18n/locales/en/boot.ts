@@ -73,7 +73,7 @@ const lines: BootLineMsg[] = [
   { kind: 'target', text: 'Reached target Network is Online.' },
   { kind: 'redacted', text: 'Establishing secure uplink to ██████████ ...' },
   { kind: 'ok', text: 'Uplink ██████████ established.' },
-  { kind: 'info', text: 'Setting system time to 2026-08-07 02:00:00 UTC ...' },
+  { kind: 'info', text: 'Setting system time to {nowStamp} UTC ...' },
   { kind: 'ok', text: 'Synchronized system clock to hardware clock.' },
   { kind: 'info', text: 'Starting User Manager for user (uid=1000) ...' },
   { kind: 'ok', text: 'Started User Manager for user (uid=1000).' },

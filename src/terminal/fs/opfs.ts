@@ -18,8 +18,12 @@ export class OpfsBackend implements FsBackend {
     const dir = await this.resolveDir(parts, path)
     const entries: FsEntry[] = []
     for await (const [name, handle] of dir.entries()) {
-      const size = handle.kind === 'file' ? (await (handle as FileHandle).getFile()).size : 4096
-      entries.push({ name, type: handle.kind === 'directory' ? 'dir' : 'file', size })
+      if (handle.kind === 'file') {
+        const file = await (handle as FileHandle).getFile()
+        entries.push({ name, type: 'file', size: file.size, mtimeMs: file.lastModified })
+      } else {
+        entries.push({ name, type: 'dir', size: 4096, mtimeMs: Date.now() })
+      }
     }
     return entries.sort((a, b) => a.name.localeCompare(b.name))
   }
@@ -120,16 +124,17 @@ export class OpfsBackend implements FsBackend {
   async stat(path: string): Promise<FsEntry> {
     const parts = toParts(path)
     if (parts.length === 0) {
-      return { name: '/', type: 'dir', size: 4096 }
+      return { name: '/', type: 'dir', size: 4096, mtimeMs: Date.now() }
     }
     const { dir, name } = await this.splitFile(path)
     try {
       await dir.getDirectoryHandle(name)
-      return { name, type: 'dir', size: 4096 }
+      return { name, type: 'dir', size: 4096, mtimeMs: Date.now() }
     } catch {
       try {
         const file = await dir.getFileHandle(name)
-        return { name, type: 'file', size: (await file.getFile()).size }
+        const blob = await file.getFile()
+        return { name, type: 'file', size: blob.size, mtimeMs: blob.lastModified }
       } catch (error) {
         throw mapLookupError(error, path, false)
       }

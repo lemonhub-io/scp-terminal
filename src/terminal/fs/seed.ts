@@ -1,4 +1,6 @@
 import { t } from '../../i18n'
+import { SITE } from '../../site/identity'
+import { readLiveFile } from '../liveFs'
 import type { FsBackend } from './types'
 
 export const HOME_DIR = '/home/user'
@@ -35,16 +37,39 @@ export const SEED_DIRS: string[] = [
   '/var/tmp',
 ]
 
+/** Always refreshed on init so locale/identity stay consistent. */
+export const REFRESH_SEED_FILES = new Set([
+  '/etc/hostname',
+  '/proc/version',
+  '/proc/uptime',
+  '/proc/loadavg',
+  '/proc/meminfo',
+  '/proc/cpuinfo',
+  '/home/user/notes.txt',
+])
+
 export function getSeedFiles(): Record<string, string> {
+  const uptime = readLiveFile('/proc/uptime') ?? '0.00 0.00\n'
+  const loadavg = readLiveFile('/proc/loadavg') ?? '0.00 0.00 0.00 1/1 1\n'
+  const meminfo = readLiveFile('/proc/meminfo') ?? ''
+  const cpuinfo = readLiveFile('/proc/cpuinfo') ?? ''
+  const version = readLiveFile('/proc/version') ?? `${SITE.product}\n`
+  const hostname = readLiveFile('/etc/hostname') ?? `${SITE.hostname}\n`
+
   return {
-    '/etc/hostname': 'localhost',
+    '/etc/hostname': hostname,
     '/etc/passwd':
       'root:x:0:0:root:/root:/bin/sh\nuser:x:1000:1000:user:/home/user:/bin/bash\n',
-    '/etc/hosts': '127.0.0.1\tlocalhost\n::1\t\tlocalhost ip6-localhost ip6-loopback\n',
+    '/etc/hosts':
+      `127.0.0.1\tlocalhost ${SITE.hostname}\n` +
+      `::1\t\tlocalhost ip6-localhost ip6-loopback\n` +
+      `10.4.2.31\t${SITE.fqdn} ${SITE.hostname}\n`,
     '/etc/fstab': '# /etc/fstab: static file system information\n',
-    '/proc/version': 'SCP-Terminal 1.0.0 (xterm.js)\n',
-    '/proc/uptime': '0.00 0.00\n',
-    '/proc/cpuinfo': 'processor\t: 0\nmodel name\t: Virtual Terminal CPU\n',
+    '/proc/version': version,
+    '/proc/uptime': uptime,
+    '/proc/loadavg': loadavg,
+    '/proc/meminfo': meminfo,
+    '/proc/cpuinfo': cpuinfo,
     '/home/user/notes.txt': t('seed.notes'),
   }
 }
@@ -78,7 +103,8 @@ export async function ensureSeedTree(fs: FsBackend): Promise<void> {
     }
   }
   for (const [path, content] of Object.entries(getSeedFiles())) {
-    if (!(await fs.exists(path))) {
+    const exists = await fs.exists(path)
+    if (!exists || REFRESH_SEED_FILES.has(path)) {
       await fs.write(path, content)
     }
   }

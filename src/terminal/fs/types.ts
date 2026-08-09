@@ -18,6 +18,8 @@ export interface FsEntry {
   name: string
   type: 'dir' | 'file'
   size: number
+  /** Epoch ms when known (OPFS files); omitted for synthetic dirs. */
+  mtimeMs?: number
 }
 
 export interface FsBackend {
